@@ -5,6 +5,11 @@ struct SettingsView: View {
     @Environment(LibraryStore.self) private var library
     @State private var confirmingClear = false
 
+    /// Taken from the bundle so the number follows `MARKETING_VERSION` in project.yml.
+    private static var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    }
+
     var body: some View {
         @Bindable var library = library
         NavigationStack {
@@ -17,7 +22,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("JLive").font(.title2.bold())
                             Text("简简单单，看你喜欢的直播。 ").font(.caption).foregroundStyle(.secondary)
-                            Text("v0.1.0").font(.caption2.monospaced()).foregroundStyle(.secondary)
+                            Text(verbatim: "v" + Self.version).font(.caption2.monospaced()).foregroundStyle(.secondary)
                         }
                     }.padding(.vertical, 10)
                 }
@@ -32,7 +37,7 @@ struct SettingsView: View {
                         HStack {
                             PlatformBadge(platform: platform)
                             Spacer()
-                            Text(platform == .bilibili ? "原生播放 / 搜索" : (platform.supportsDiscovery ? "浏览 / 搜索 / 官网观看" : "官网观看 / 链接收藏"))
+                            Text(platform == .bilibili ? "原生播放 / 弹幕 / 搜索" : (platform.supportsDiscovery ? "浏览 / 搜索 / 官网观看" : "官网观看 / 链接收藏"))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }

@@ -28,6 +28,7 @@ public enum LivePlatform: String, CaseIterable, Codable, Identifiable, Sendable 
     }
     public var supportsDiscovery: Bool { self != .douyin }
     public var supportsNativePlayback: Bool { self == .bilibili }
+    public var supportsChat: Bool { self == .bilibili }
 
     public func roomURL(_ roomID: String) -> URL {
         homeURL.appendingPathComponent(roomID)

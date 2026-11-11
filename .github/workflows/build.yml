@@ -1,0 +1,123 @@
+name: 编译 IPA
+
+# 每次推送到 main 都会测试并编译未签名的 IPA。
+# 如果 project.yml 里的 MARKETING_VERSION 还没有对应的 v<版本号> 标签，
+# 就同时创建 GitHub Release，更新日志取自上一个版本以来的 git log。
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - LICENSE
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: 测试并编译
+    runs-on: macos-latest
+    steps:
+      - name: 签出代码
+        uses: actions/checkout@v4
+        with:
+          # 更新日志和版本判断需要完整的历史与标签
+          fetch-depth: 0
+
+      - name: 读取版本号
+        id: version
+        run: |
+          version=$(sed -n 's/^ *MARKETING_VERSION: *"\(.*\)" *$/\1/p' project.yml | head -n 1)
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]]; then
+            echo "::error::project.yml 里的 MARKETING_VERSION 不是有效的版本号：'$version'"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "v$version 已经发布过，本次只编译。"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "v$version 是新版本，编译后会创建 Release。"
+          fi
+
+      - name: 显示工具链版本
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: 运行核心测试
+        run: swift test --package-path JLiveCore 2>&1 | tee test.log
+
+      - name: 编译未签名的 App
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          xcodebuild -quiet -project JLive.xcodeproj -scheme JLive -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee build.log
+
+      - name: 打包 IPA
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p dist/Payload
+          cp -R build/Build/Products/Release-iphoneos/JLive.app dist/Payload/
+          cd dist
+          zip -qry "JLive-$VERSION.ipa" Payload
+          ls -lh "JLive-$VERSION.ipa"
+
+      - name: 上传编译产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: JLive-${{ steps.version.outputs.version }}-build${{ github.run_number }}
+          path: dist/*.ipa
+          if-no-files-found: error
+
+      - name: 生成更新日志
+        if: steps.version.outputs.release == 'true'
+        run: |
+          previous=$(git describe --tags --abbrev=0 2> /dev/null || true)
+          range="${previous:+$previous..}HEAD"
+          {
+            echo "## 更新内容"
+            echo
+            git log --no-merges --pretty='- %s (%h)' "$range"
+            echo
+            echo "## 安装"
+            echo
+            echo "IPA 没有签名，需要用 AltStore、SideStore、Sideloadly 或 TrollStore 等工具自行签名后安装。"
+          } > dist/notes.md
+          cat dist/notes.md
+
+      - name: 发布版本
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$VERSION" "dist/JLive-$VERSION.ipa" \
+            --title "JLive $VERSION" --notes-file dist/notes.md --target "$GITHUB_SHA"
+
+      - name: 汇总错误
+        if: failure()
+        run: |
+          # 把编译和测试的报错提到运行摘要里，不用翻完整日志
+          for log in test.log build.log; do
+            [ -f "$log" ] || continue
+            { grep -E 'error:|✘' "$log" || true; } | sort -u | head -n 20 | while IFS= read -r line; do
+              echo "::error title=$log::$line"
+            done
+          done

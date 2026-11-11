@@ -23,6 +23,10 @@ final class PlayerModel {
         self.room = room
         self.service = service
         player.allowsExternalPlayback = true
+        #if DEBUG
+        // Lets simulator checks run without playing the stream through the Mac's speakers.
+        if CommandLine.arguments.contains("--muted") { player.isMuted = true }
+        #endif
     }
 
     func load(quality: Int? = nil) async {

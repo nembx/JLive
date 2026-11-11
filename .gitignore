@@ -5,5 +5,7 @@ DerivedData/
 xcuserdata/
 .swiftpm/
 build/
+dist/
+*.log
 *.ipa
 *.dSYM/

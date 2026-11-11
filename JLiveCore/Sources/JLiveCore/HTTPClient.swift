@@ -17,6 +17,10 @@ public enum JSONValue: Decodable, Sendable {
         guard case .object(let value) = self else { return .null }
         return value[key] ?? .null
     }
+    public subscript(index: Int) -> JSONValue {
+        guard case .array(let value) = self, value.indices.contains(index) else { return .null }
+        return value[index]
+    }
     public var string: String {
         switch self {
         case .string(let value): value

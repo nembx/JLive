@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		35316522142CF8DE7F844AE8 /* ChatViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0AB278B123B48613A498D6B /* ChatViews.swift */; };
 		6793B0879EBCDD8E9DE660F2 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 973BFC7C05E539B2A7B63D36 /* LICENSE */; };
 		6F5C7DE8894BAC1B474CDA71 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F4D2E3180E8D700F400DB18 /* SettingsView.swift */; };
 		7A2E59754520BDB53C44D39B /* RoomDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEB0CA39D5DA2FD00F26F92E /* RoomDetailView.swift */; };
@@ -17,10 +18,12 @@
 		D9905B4C884E3592A936EA13 /* JLiveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976CB76C96A5F33F8191AFAB /* JLiveApp.swift */; };
 		DC9DAC99FC3396029BFD0AA4 /* JLiveCore in Frameworks */ = {isa = PBXBuildFile; productRef = BDFBB56E718136750A261EEC /* JLiveCore */; };
 		F1C928469A666DF8F5081ED0 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92590DEB1507ED9BBA235F1C /* Components.swift */; };
+		F2BB96937D17FDB05263AA8C /* ChatModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 082B2C68D6E961B7FEDF9996 /* ChatModel.swift */; };
 		F5512F3E3E85518C20F8EAF8 /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1F9403A5889FD42E161449 /* LibraryStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		082B2C68D6E961B7FEDF9996 /* ChatModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatModel.swift; sourceTree = "<group>"; };
 		18001267F7FEAD9156EC39FF /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		20D2324CF80AE9BA07693C7D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2F1F9403A5889FD42E161449 /* LibraryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStore.swift; sourceTree = "<group>"; };
@@ -31,6 +34,7 @@
 		92590DEB1507ED9BBA235F1C /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		973BFC7C05E539B2A7B63D36 /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
 		976CB76C96A5F33F8191AFAB /* JLiveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JLiveApp.swift; sourceTree = "<group>"; };
+		A0AB278B123B48613A498D6B /* ChatViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViews.swift; sourceTree = "<group>"; };
 		C1BF66CAF54D2079C333DB37 /* JLiveCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = JLiveCore; path = JLiveCore; sourceTree = SOURCE_ROOT; };
 		EEB0CA39D5DA2FD00F26F92E /* RoomDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomDetailView.swift; sourceTree = "<group>"; };
 		F541742BA24955DD772DC6ED /* PlayerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerModel.swift; sourceTree = "<group>"; };
@@ -70,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				9192AECA3CFD557E9C6E4EAD /* BrowseModel.swift */,
+				082B2C68D6E961B7FEDF9996 /* ChatModel.swift */,
 				2F1F9403A5889FD42E161449 /* LibraryStore.swift */,
 				F541742BA24955DD772DC6ED /* PlayerModel.swift */,
 			);
@@ -99,6 +104,7 @@
 			isa = PBXGroup;
 			children = (
 				4DA8155B8CB3CB194D1A7140 /* BrowseView.swift */,
+				A0AB278B123B48613A498D6B /* ChatViews.swift */,
 				92590DEB1507ED9BBA235F1C /* Components.swift */,
 				18001267F7FEAD9156EC39FF /* LibraryView.swift */,
 				EEB0CA39D5DA2FD00F26F92E /* RoomDetailView.swift */,
@@ -184,6 +190,8 @@
 			files = (
 				80915E9D8AC864CFBDD8BD85 /* BrowseModel.swift in Sources */,
 				AF0EDAAD002AB867937897E1 /* BrowseView.swift in Sources */,
+				F2BB96937D17FDB05263AA8C /* ChatModel.swift in Sources */,
+				35316522142CF8DE7F844AE8 /* ChatViews.swift in Sources */,
 				F1C928469A666DF8F5081ED0 /* Components.swift in Sources */,
 				D9905B4C884E3592A936EA13 /* JLiveApp.swift in Sources */,
 				F5512F3E3E85518C20F8EAF8 /* LibraryStore.swift in Sources */,
@@ -276,7 +284,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -361,7 +369,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

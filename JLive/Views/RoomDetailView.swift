@@ -8,13 +8,17 @@ struct RoomDetailView: View {
     let service: LiveService
     @Environment(LibraryStore.self) private var library
     @State private var model: PlayerModel
+    @State private var chat: ChatModel
     @State private var showingWebsite = false
+    @State private var isFullScreen = false
+    @State private var needsLoad = true
     @Environment(\.scenePhase) private var scenePhase
 
     init(room: LiveRoom, service: LiveService) {
         self.room = room
         self.service = service
         _model = State(initialValue: PlayerModel(room: room, service: service))
+        _chat = State(initialValue: ChatModel(service: service))
     }
 
     var body: some View {
@@ -53,6 +57,7 @@ struct RoomDetailView: View {
                         .accessibilityLabel(library.contains(model.room) ? "取消收藏" : "收藏直播间")
                     }
                     if let info = model.playbackInfo { playbackControls(info) }
+                    if model.room.platform.supportsChat { ChatPanel(chat: chat) }
                     if !model.room.platform.supportsNativePlayback {
                         VStack(alignment: .leading, spacing: 10) {
                             Label("前往平台观看", systemImage: "safari").font(.headline)
@@ -80,11 +85,25 @@ struct RoomDetailView: View {
         .toolbar(.visible, for: .navigationBar)
         .sheet(isPresented: $showingWebsite) { WebsiteView(url: model.room.webURL).ignoresSafeArea() }
         .task {
+            // The task runs again whenever the page reappears, e.g. after leaving full screen.
+            guard needsLoad else { return }
+            needsLoad = false
             library.record(room)
             await model.load()
-            if !Task.isCancelled { library.enrich(original: room, updated: model.room) }
+            guard !Task.isCancelled else {
+                needsLoad = true
+                return
+            }
+            library.enrich(original: room, updated: model.room)
+            chat.start(room: model.room)
         }
-        .onDisappear { model.stop() }
+        .onDisappear {
+            // Full screen is presented by another controller, so the page disappears while the video keeps playing.
+            guard !isFullScreen else { return }
+            needsLoad = true
+            model.stop()
+            chat.stop()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.player.pause() }
         }
@@ -94,7 +113,7 @@ struct RoomDetailView: View {
         ZStack {
             Color.black
             if model.room.platform.supportsNativePlayback {
-                NativePlayerView(player: model.player)
+                NativePlayerView(player: model.player, chat: chat, isFullScreen: $isFullScreen)
                 if model.isResolving || model.isPreparing {
                     ProgressView(model.isResolving ? "获取直播线路…" : "正在连接直播…")
                         .tint(.white).foregroundStyle(.white).font(.caption)
@@ -159,18 +178,76 @@ struct RoomDetailView: View {
 
 private struct NativePlayerView: UIViewControllerRepresentable {
     let player: AVPlayer
+    let chat: ChatModel
+    @Binding var isFullScreen: Bool
+
+    func makeCoordinator() -> Coordinator { Coordinator(isFullScreen: $isFullScreen) }
+
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
         controller.player = player
+        controller.delegate = context.coordinator
         controller.allowsPictureInPicturePlayback = false
         controller.videoGravity = .resizeAspect
+        controller.loadViewIfNeeded()
+        // The overlay view sits between the video and the playback controls.
+        if let surface = controller.contentOverlayView {
+            let overlay = UIHostingController(rootView: DanmakuOverlay(chat: chat))
+            overlay.view.backgroundColor = .clear
+            overlay.view.isUserInteractionEnabled = false
+            overlay.view.translatesAutoresizingMaskIntoConstraints = false
+            surface.addSubview(overlay.view)
+            NSLayoutConstraint.activate([
+                overlay.view.leadingAnchor.constraint(equalTo: surface.leadingAnchor),
+                overlay.view.trailingAnchor.constraint(equalTo: surface.trailingAnchor),
+                overlay.view.topAnchor.constraint(equalTo: surface.topAnchor),
+                overlay.view.bottomAnchor.constraint(equalTo: surface.bottomAnchor)
+            ])
+            context.coordinator.overlay = overlay
+        }
         return controller
     }
+
     func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
         controller.player = player
     }
-    static func dismantleUIViewController(_ controller: AVPlayerViewController, coordinator: ()) {
+
+    static func dismantleUIViewController(_ controller: AVPlayerViewController, coordinator: Coordinator) {
         controller.player = nil
+        coordinator.overlay?.view.removeFromSuperview()
+        coordinator.overlay = nil
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, @preconcurrency AVPlayerViewControllerDelegate {
+        var overlay: UIHostingController<DanmakuOverlay>?
+        private let isFullScreen: Binding<Bool>
+
+        init(isFullScreen: Binding<Bool>) { self.isFullScreen = isFullScreen }
+
+        func playerViewController(
+            _ playerViewController: AVPlayerViewController,
+            willBeginFullScreenPresentationWithAnimationCoordinator coordinator: any UIViewControllerTransitionCoordinator
+        ) {
+            isFullScreen.wrappedValue = true
+            _ = coordinator.animate(alongsideTransition: nil) { [isFullScreen] context in
+                // An abandoned transition leaves the player in line.
+                if context.isCancelled { isFullScreen.wrappedValue = false }
+            }
+        }
+
+        func playerViewController(
+            _ playerViewController: AVPlayerViewController,
+            willEndFullScreenPresentationWithAnimationCoordinator coordinator: any UIViewControllerTransitionCoordinator
+        ) {
+            let wasPlaying = playerViewController.player?.timeControlStatus != .paused
+            _ = coordinator.animate(alongsideTransition: nil) { [isFullScreen] context in
+                guard !context.isCancelled else { return }
+                isFullScreen.wrappedValue = false
+                // AVKit pauses when full screen is dismissed; a live stream should keep going.
+                if wasPlaying { playerViewController.player?.play() }
+            }
+        }
     }
 }
 

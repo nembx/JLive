@@ -6,11 +6,13 @@ public protocol LiveProvider: Sendable {
     func search(keyword: String, page: Int) async throws -> RoomPage
     func detail(room: LiveRoom) async throws -> LiveRoom
     func playback(roomID: String, quality: Int?) async throws -> PlaybackInfo
+    func chat(roomID: String) async throws -> LiveChatEndpoint
 }
 
 public extension LiveProvider {
     func detail(room: LiveRoom) async throws -> LiveRoom { room }
     func playback(roomID: String, quality: Int?) async throws -> PlaybackInfo { throw LiveError.unsupported }
+    func chat(roomID: String) async throws -> LiveChatEndpoint { throw LiveError.unsupported }
 }
 
 public struct PlatformIssue: Identifiable, Sendable {
@@ -89,6 +91,11 @@ public struct LiveService: Sendable {
     public func playback(_ room: LiveRoom, quality: Int? = nil) async throws -> PlaybackInfo {
         guard let provider = providers[room.platform] else { throw LiveError.unsupported }
         return try await provider.playback(roomID: room.roomID, quality: quality)
+    }
+
+    public func chat(_ room: LiveRoom) async throws -> LiveChatEndpoint {
+        guard let provider = providers[room.platform] else { throw LiveError.unsupported }
+        return try await provider.chat(roomID: room.roomID)
     }
 
     private struct ProviderResult: Sendable {

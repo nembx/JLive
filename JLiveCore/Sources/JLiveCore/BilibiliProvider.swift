@@ -6,7 +6,9 @@ public actor BilibiliProvider: LiveProvider {
     public nonisolated let platform = LivePlatform.bilibili
     private let client: any HTTPRequesting
     private var cookie: String?
+    private var buvid: String?
     private var keys: (image: String, sub: String, fetchedAt: Date)?
+    private var canonicalRoomIDs: [String: String] = [:]
     private let base = "https://api.live.bilibili.com"
 
     public init(client: any HTTPRequesting) { self.client = client }
@@ -16,6 +18,7 @@ public actor BilibiliProvider: LiveProvider {
             let response = try await client.get(try endpoint("https://api.bilibili.com/x/frontend/finger/spi"), headers: [:])
             let data = response["data"]
             guard !data["b_3"].string.isEmpty else { throw LiveError.invalidResponse }
+            buvid = data["b_3"].string
             cookie = "buvid3=\(data["b_3"].string);buvid4=\(data["b_4"].string);"
         }
         return ["Referer": "https://live.bilibili.com/", "User-Agent": HTTPClient.userAgent, "Cookie": cookie ?? ""]
@@ -80,6 +83,8 @@ public actor BilibiliProvider: LiveProvider {
         let info = data["room_info"]
         let anchor = data["anchor_info"]["base_info"]
         guard !info["room_id"].string.isEmpty else { throw LiveError.invalidResponse }
+        canonicalRoomIDs[room.roomID] = info["room_id"].string
+        canonicalRoomIDs[info["room_id"].string] = info["room_id"].string
         return LiveRoom(
             platform: .bilibili, roomID: info["room_id"].string, title: plainText(info["title"].string),
             streamer: anchor["uname"].string, coverURL: imageURL(info["cover"].string),
@@ -127,5 +132,40 @@ public actor BilibiliProvider: LiveProvider {
             .map { StreamQuality(id: $0["qn"].int, name: $0["desc"].string) }
             .sorted { $0.id > $1.id }
         return PlaybackInfo(lines: lines, qualities: qualities, currentQuality: currentQuality, headers: headers)
+    }
+
+    public func chat(roomID: String) async throws -> LiveChatEndpoint {
+        // The chat server only knows the canonical room number, not the short alias used in links.
+        var canonical = canonicalRoomIDs[roomID]
+        if canonical == nil {
+            let info = try await request("/room/v1/Room/get_info", query: ["room_id": roomID])
+            canonical = info["room_id"].string
+            canonicalRoomIDs[roomID] = canonical
+        }
+        guard let canonical, let room = Int(canonical) else { throw LiveError.invalidResponse }
+        let data = try await request("/xlive/web-room/v1/index/getDanmuInfo", query: ["id": canonical, "type": "0"], signed: true)
+        guard let buvid else { throw LiveError.invalidResponse }
+        return try Self.chatEndpoint(roomID: room, token: data["token"].string, hosts: data["host_list"], buvid: buvid)
+    }
+
+    public static func chatEndpoint(roomID: Int, token: String, hosts: JSONValue, buvid: String) throws -> LiveChatEndpoint {
+        guard !token.isEmpty else { throw LiveError.invalidResponse }
+        let urls = hosts.array.compactMap { host -> URL? in
+            let name = host["host"].string
+            guard !name.isEmpty else { return nil }
+            let port = host["wss_port"].int
+            return URL(string: "wss://\(name):\(port > 0 ? port : 443)/sub")
+        }
+        return LiveChatEndpoint(
+            urls: urls.isEmpty ? [URL(string: "wss://\(BilibiliChatCodec.fallbackHost)/sub")!] : urls,
+            headers: [
+                "User-Agent": HTTPClient.userAgent, "Origin": "https://live.bilibili.com",
+                "Cookie": "buvid3=\(buvid);"
+            ],
+            handshake: try BilibiliChatCodec.handshake(roomID: roomID, token: token, buvid: buvid),
+            heartbeat: BilibiliChatCodec.heartbeat(),
+            heartbeatInterval: 30,
+            decode: { try BilibiliChatCodec.decode($0) }
+        )
     }
 }
