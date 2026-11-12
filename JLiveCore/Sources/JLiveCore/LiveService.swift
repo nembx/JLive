@@ -98,6 +98,15 @@ public struct LiveService: Sendable {
         return try await provider.chat(roomID: room.roomID)
     }
 
+    public func setBilibiliCredentials(_ credentials: BilibiliCredentials?) async {
+        await (providers[.bilibili] as? BilibiliProvider)?.setCredentials(credentials)
+    }
+
+    public func sendChat(_ text: String, room: LiveRoom) async throws {
+        guard room.platform == .bilibili, let provider = providers[.bilibili] as? BilibiliProvider else { throw LiveError.unsupported }
+        try await provider.sendChat(roomID: room.roomID, text: text)
+    }
+
     private struct ProviderResult: Sendable {
         let platform: LivePlatform
         let page: RoomPage?

@@ -27,8 +27,8 @@ public enum LivePlatform: String, CaseIterable, Codable, Identifiable, Sendable 
         }
     }
     public var supportsDiscovery: Bool { self != .douyin }
-    public var supportsNativePlayback: Bool { self == .bilibili }
-    public var supportsChat: Bool { self == .bilibili }
+    public var supportsNativePlayback: Bool { self != .douyin }
+    public var supportsChat: Bool { self != .douyin }
 
     public func roomURL(_ roomID: String) -> URL {
         homeURL.appendingPathComponent(roomID)
@@ -122,7 +122,7 @@ public enum LiveError: LocalizedError, Sendable {
         case .platform(let message): "平台暂时无法访问：\(message)"
         case .offline: "主播还未开播，收藏后下次再来看看。"
         case .noPlayableStream: "暂时没有可播放的线路，可以前往平台观看。"
-        case .unsupported: "这个平台目前支持在官网观看。"
+        case .unsupported: "这个功能暂未接入，可以前往平台官网使用。"
         case .invalidRoomLink: "请输入 B站、虎牙、斗鱼或抖音的直播间链接。"
         }
     }

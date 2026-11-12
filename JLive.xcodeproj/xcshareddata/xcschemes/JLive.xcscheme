@@ -39,7 +39,31 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "98107636E7F5DB4CBE4E2B66"
+               BuildableName = "JLiveTests.xctest"
+               BlueprintName = "JLiveTests"
+               ReferencedContainer = "container:JLive.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F86748972B286E84F0CECA55"
+               BuildableName = "JLiveUITests.xctest"
+               BlueprintName = "JLiveUITests"
+               ReferencedContainer = "container:JLive.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
+      <CommandLineArguments>
+      </CommandLineArguments>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

@@ -21,6 +21,7 @@ final class ChatModel {
         let width: CGFloat
         let duration: Double
         let delay: Double
+        let fontSize: CGFloat
     }
 
     enum Status: Equatable {
@@ -28,7 +29,12 @@ final class ChatModel {
         case failed(String)
     }
 
-    static let laneHeight: CGFloat = 26
+    var laneHeight: CGFloat { CGFloat(fontSize) + 11 }
+    var fontSize: Double { didSet { defaults.set(fontSize, forKey: "jlive.danmaku.size"); resetFloating() } }
+    var opacity: Double { didSet { defaults.set(opacity, forKey: "jlive.danmaku.opacity") } }
+    var speed: Double { didSet { defaults.set(speed, forKey: "jlive.danmaku.speed"); resetFloating() } }
+    var area: Double { didSet { defaults.set(area, forKey: "jlive.danmaku.area"); resetFloating() } }
+    var blockedWords: String { didSet { defaults.set(blockedWords, forKey: "jlive.danmaku.blocked"); resetFloating() } }
     private static let floatingKey = "jlive.danmaku.floating"
     private static let maxEntries = 200
     private static let maxFloating = 22
@@ -53,7 +59,7 @@ final class ChatModel {
         }
     }
 
-    var laneCount: Int { max(1, min(8, Int(viewport.height * 0.6 / Self.laneHeight))) }
+    var laneCount: Int { max(1, min(12, Int(max(0, viewport.height - 58) * area / laneHeight))) }
 
     @ObservationIgnored private let service: LiveService
     @ObservationIgnored private let client: LiveChatClient
@@ -64,12 +70,18 @@ final class ChatModel {
     @ObservationIgnored private var nextID = 0
     @ObservationIgnored private var laneFree: [Date] = []
     @ObservationIgnored private var room: LiveRoom?
+    @ObservationIgnored private var generation = UUID()
 
     init(service: LiveService, client: LiveChatClient = LiveChatClient(), defaults: UserDefaults = .standard) {
         self.service = service
         self.client = client
         self.defaults = defaults
         showsFloating = defaults.object(forKey: Self.floatingKey) as? Bool ?? true
+        fontSize = min(24, max(12, defaults.object(forKey: "jlive.danmaku.size") as? Double ?? 15))
+        opacity = min(1, max(0.25, defaults.object(forKey: "jlive.danmaku.opacity") as? Double ?? 0.9))
+        speed = min(1.8, max(0.6, defaults.object(forKey: "jlive.danmaku.speed") as? Double ?? 1))
+        area = min(1, max(0.25, defaults.object(forKey: "jlive.danmaku.area") as? Double ?? 0.6))
+        blockedWords = defaults.string(forKey: "jlive.danmaku.blocked") ?? ""
     }
 
     func start(room: LiveRoom) {
@@ -77,24 +89,26 @@ final class ChatModel {
         guard room.platform.supportsChat else { return }
         self.room = room
         status = .connecting
+        let token = generation
         let service = service
         let client = client
         session = Task { [weak self] in
             do {
                 let endpoint = try await service.chat(room)
-                guard let self, !Task.isCancelled else { return }
+                guard let self, self.generation == token, !Task.isCancelled else { return }
                 for try await event in client.events(endpoint) {
-                    guard !Task.isCancelled else { return }
+                    guard self.generation == token, !Task.isCancelled else { return }
                     self.handle(event)
                 }
-                self.finish(with: "弹幕连接已断开")
+                if self.generation == token, !Task.isCancelled { self.finish(with: "弹幕连接已断开") }
             } catch {
-                self?.finish(with: error.localizedDescription)
+                if self?.generation == token, !Task.isCancelled { self?.finish(with: error.localizedDescription) }
             }
         }
     }
 
     func stop() {
+        generation = UUID()
         session?.cancel()
         session = nil
         flush?.cancel()
@@ -103,6 +117,11 @@ final class ChatModel {
         floating.removeAll()
         laneFree.removeAll()
         status = .idle
+    }
+
+    private func resetFloating() {
+        floating.removeAll()
+        laneFree.removeAll()
     }
 
     func restart() {
@@ -125,7 +144,11 @@ final class ChatModel {
         case .connected: status = .connected
         case .reconnecting: status = .reconnecting
         case .message(let message):
+            let words = blockedWords.split(whereSeparator: { $0 == "," || $0 == "，" || $0.isNewline })
+                .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            guard !words.contains(where: { message.text.localizedCaseInsensitiveContains($0) }) else { return }
             pending.append(message)
+            if pending.count > Self.maxEntries { pending.removeFirst(pending.count - Self.maxEntries) }
             scheduleFlush()
         }
     }
@@ -170,19 +193,19 @@ final class ChatModel {
         let now = Date()
         // Every message moves at the same speed, so a lane is free once the previous one fits in.
         guard let lane = laneFree.indices.first(where: { laneFree[$0] <= now }) else { return }
-        let width = Self.measure(message.text) + (isSuperChat ? 20 : 0)
-        let speed = max(70, viewport.width / 6.5)
+        let width = measure(message.text) + (isSuperChat ? 20 : 0)
+        let speed = max(70, viewport.width / 6.5) * self.speed
         let delay = Double.random(in: 0...0.25)
         laneFree[lane] = now.addingTimeInterval(delay + Double((width + 26) / speed))
         floating.append(Floating(
             id: id, text: message.text, color: message.color, isSuperChat: isSuperChat, lane: lane,
-            width: width, duration: Double((viewport.width + width) / speed), delay: delay
+            width: width, duration: Double((viewport.width + width) / speed), delay: delay, fontSize: CGFloat(fontSize)
         ))
         if floating.count > Self.maxFloating { floating.removeFirst(floating.count - Self.maxFloating) }
     }
 
-    private static func measure(_ text: String) -> CGFloat {
-        let attributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 15, weight: .semibold)]
+    private func measure(_ text: String) -> CGFloat {
+        let attributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: CGFloat(fontSize), weight: .semibold)]
         return ceil((text as NSString).size(withAttributes: attributes).width) + 2
     }
 }

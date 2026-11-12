@@ -4,7 +4,7 @@ import Foundation
 
 public struct HuyaProvider: LiveProvider {
     public let platform = LivePlatform.huya
-    private let client: any HTTPRequesting
+    let client: any HTTPRequesting
     public init(client: any HTTPRequesting) { self.client = client }
 
     public func recommendations(page: Int) async throws -> RoomPage {
@@ -48,7 +48,7 @@ public struct HuyaProvider: LiveProvider {
 
 public struct DouyuProvider: LiveProvider {
     public let platform = LivePlatform.douyu
-    private let client: any HTTPRequesting
+    let client: any HTTPRequesting
     public init(client: any HTTPRequesting) { self.client = client }
 
     public func recommendations(page: Int) async throws -> RoomPage {

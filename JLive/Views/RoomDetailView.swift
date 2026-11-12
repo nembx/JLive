@@ -7,10 +7,11 @@ struct RoomDetailView: View {
     let room: LiveRoom
     let service: LiveService
     @Environment(LibraryStore.self) private var library
+    @Environment(AccountStore.self) private var account
     @State private var model: PlayerModel
     @State private var chat: ChatModel
     @State private var showingWebsite = false
-    @State private var isFullScreen = false
+    @State private var presentation = PlayerPresentation()
     @State private var needsLoad = true
     @Environment(\.scenePhase) private var scenePhase
 
@@ -22,9 +23,9 @@ struct RoomDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                playerArea
+        VStack(spacing: 0) {
+            playerArea
+            ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack(spacing: 8) {
                         PlatformBadge(platform: model.room.platform)
@@ -56,8 +57,8 @@ struct RoomDetailView: View {
                         }
                         .accessibilityLabel(library.contains(model.room) ? "取消收藏" : "收藏直播间")
                     }
-                    if let info = model.playbackInfo { playbackControls(info) }
                     if model.room.platform.supportsChat { ChatPanel(chat: chat) }
+                    if model.room.platform == .bilibili { ChatComposer(room: model.room, service: service) }
                     if !model.room.platform.supportsNativePlayback {
                         VStack(alignment: .leading, spacing: 10) {
                             Label("前往平台观看", systemImage: "safari").font(.headline)
@@ -76,13 +77,14 @@ struct RoomDetailView: View {
                     }
                     .font(.subheadline).padding(.top, 4)
                 }
-                .padding(.horizontal, 20)
+                .padding(20)
+                .padding(.bottom, 12)
             }
-            .padding(.bottom, 30)
         }
         .background(JLiveTheme.background)
         .navigationTitle(model.room.platform.name).navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .sheet(isPresented: $showingWebsite) { WebsiteView(url: model.room.webURL).ignoresSafeArea() }
         .task {
             // The task runs again whenever the page reappears, e.g. after leaving full screen.
@@ -99,13 +101,17 @@ struct RoomDetailView: View {
         }
         .onDisappear {
             // Full screen is presented by another controller, so the page disappears while the video keeps playing.
-            guard !isFullScreen else { return }
+            guard !presentation.isFullScreen else { return }
             needsLoad = true
             model.stop()
             chat.stop()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { model.player.pause() }
+            if phase == .background, !presentation.isInPictureInPicture { model.suspend() }
+            if phase == .active { model.resume() }
+        }
+        .onChange(of: account.credentials?.uid) { _, _ in
+            if !needsLoad { chat.restart() }
         }
     }
 
@@ -113,25 +119,7 @@ struct RoomDetailView: View {
         ZStack {
             Color.black
             if model.room.platform.supportsNativePlayback {
-                NativePlayerView(player: model.player, chat: chat, isFullScreen: $isFullScreen)
-                if model.isResolving || model.isPreparing {
-                    ProgressView(model.isResolving ? "获取直播线路…" : "正在连接直播…")
-                        .tint(.white).foregroundStyle(.white).font(.caption)
-                        .padding(18).background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
-                }
-                if let error = model.errorMessage {
-                    VStack(spacing: 12) {
-                        Image(systemName: "antenna.radiowaves.left.and.right.slash").font(.title2)
-                        Text(error).font(.caption).multilineTextAlignment(.center).lineLimit(3)
-                        HStack {
-                            Button("重试") { Task { await model.load() } }.buttonStyle(.bordered)
-                            Button("官网观看") { showingWebsite = true }.buttonStyle(.bordered)
-                        }
-                        .font(.caption.weight(.semibold))
-                    }
-                    .foregroundStyle(.white).padding(20).frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.black.opacity(0.85))
-                }
+                LivePlayerView(model: model, chat: chat, presentation: presentation) { showingWebsite = true }
             } else {
                 AsyncImage(url: model.room.coverURL) { image in image.resizable().scaledToFill().opacity(0.5) } placeholder: { Color.black }
                 Button { showingWebsite = true } label: {
@@ -141,114 +129,9 @@ struct RoomDetailView: View {
                 .accessibilityLabel("在官网观看")
             }
         }
-        .frame(height: 235).clipped()
+        .aspectRatio(16 / 9, contentMode: .fit).clipped()
     }
 
-    private func playbackControls(_ info: PlaybackInfo) -> some View {
-        HStack(spacing: 12) {
-            Menu {
-                ForEach(info.qualities) { quality in
-                    Button {
-                        Task { await model.load(quality: quality.id) }
-                    } label: {
-                        if model.selectedQuality == quality.id { Label(quality.name, systemImage: "checkmark") }
-                        else { Text(quality.name) }
-                    }
-                }
-            } label: {
-                Label(info.qualities.first { $0.id == model.selectedQuality }?.name ?? "自动画质", systemImage: "slider.horizontal.3")
-            }
-            .disabled(model.isResolving || info.qualities.isEmpty)
-            Spacer()
-            Menu {
-                ForEach(Array(info.lines.enumerated()), id: \.offset) { index, _ in
-                    Button {
-                        model.playLine(index)
-                    } label: {
-                        if index == model.selectedLine { Label("线路 \(index + 1)", systemImage: "checkmark") }
-                        else { Text("线路 \(index + 1)") }
-                    }
-                }
-            } label: { Label("线路 \(model.selectedLine + 1)", systemImage: "network") }
-                .disabled(model.isResolving)
-        }
-        .font(.subheadline).padding(15).background(JLiveTheme.surface, in: RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-private struct NativePlayerView: UIViewControllerRepresentable {
-    let player: AVPlayer
-    let chat: ChatModel
-    @Binding var isFullScreen: Bool
-
-    func makeCoordinator() -> Coordinator { Coordinator(isFullScreen: $isFullScreen) }
-
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let controller = AVPlayerViewController()
-        controller.player = player
-        controller.delegate = context.coordinator
-        controller.allowsPictureInPicturePlayback = false
-        controller.videoGravity = .resizeAspect
-        controller.loadViewIfNeeded()
-        // The overlay view sits between the video and the playback controls.
-        if let surface = controller.contentOverlayView {
-            let overlay = UIHostingController(rootView: DanmakuOverlay(chat: chat))
-            overlay.view.backgroundColor = .clear
-            overlay.view.isUserInteractionEnabled = false
-            overlay.view.translatesAutoresizingMaskIntoConstraints = false
-            surface.addSubview(overlay.view)
-            NSLayoutConstraint.activate([
-                overlay.view.leadingAnchor.constraint(equalTo: surface.leadingAnchor),
-                overlay.view.trailingAnchor.constraint(equalTo: surface.trailingAnchor),
-                overlay.view.topAnchor.constraint(equalTo: surface.topAnchor),
-                overlay.view.bottomAnchor.constraint(equalTo: surface.bottomAnchor)
-            ])
-            context.coordinator.overlay = overlay
-        }
-        return controller
-    }
-
-    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
-        controller.player = player
-    }
-
-    static func dismantleUIViewController(_ controller: AVPlayerViewController, coordinator: Coordinator) {
-        controller.player = nil
-        coordinator.overlay?.view.removeFromSuperview()
-        coordinator.overlay = nil
-    }
-
-    @MainActor
-    final class Coordinator: NSObject, @preconcurrency AVPlayerViewControllerDelegate {
-        var overlay: UIHostingController<DanmakuOverlay>?
-        private let isFullScreen: Binding<Bool>
-
-        init(isFullScreen: Binding<Bool>) { self.isFullScreen = isFullScreen }
-
-        func playerViewController(
-            _ playerViewController: AVPlayerViewController,
-            willBeginFullScreenPresentationWithAnimationCoordinator coordinator: any UIViewControllerTransitionCoordinator
-        ) {
-            isFullScreen.wrappedValue = true
-            _ = coordinator.animate(alongsideTransition: nil) { [isFullScreen] context in
-                // An abandoned transition leaves the player in line.
-                if context.isCancelled { isFullScreen.wrappedValue = false }
-            }
-        }
-
-        func playerViewController(
-            _ playerViewController: AVPlayerViewController,
-            willEndFullScreenPresentationWithAnimationCoordinator coordinator: any UIViewControllerTransitionCoordinator
-        ) {
-            let wasPlaying = playerViewController.player?.timeControlStatus != .paused
-            _ = coordinator.animate(alongsideTransition: nil) { [isFullScreen] context in
-                guard !context.isCancelled else { return }
-                isFullScreen.wrappedValue = false
-                // AVKit pauses when full screen is dismissed; a live stream should keep going.
-                if wasPlaying { playerViewController.player?.play() }
-            }
-        }
-    }
 }
 
 private struct WebsiteView: UIViewControllerRepresentable {

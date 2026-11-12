@@ -9,6 +9,7 @@ public actor BilibiliProvider: LiveProvider {
     private var buvid: String?
     private var keys: (image: String, sub: String, fetchedAt: Date)?
     private var canonicalRoomIDs: [String: String] = [:]
+    private var credentials: BilibiliCredentials?
     private let base = "https://api.live.bilibili.com"
 
     public init(client: any HTTPRequesting) { self.client = client }
@@ -21,7 +22,24 @@ public actor BilibiliProvider: LiveProvider {
             buvid = data["b_3"].string
             cookie = "buvid3=\(data["b_3"].string);buvid4=\(data["b_4"].string);"
         }
-        return ["Referer": "https://live.bilibili.com/", "User-Agent": HTTPClient.userAgent, "Cookie": cookie ?? ""]
+        return ["Referer": "https://live.bilibili.com/", "User-Agent": HTTPClient.userAgent, "Cookie": (cookie ?? "") + (credentials?.cookie ?? "")]
+    }
+
+    public func setCredentials(_ credentials: BilibiliCredentials?) {
+        self.credentials = credentials
+        keys = nil
+    }
+
+    public func sendChat(roomID: String, text: String) async throws {
+        guard let credentials else { throw LiveError.platform("请先登录 B站账号") }
+        let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty, message.count <= 30, let id = Int(roomID), id > 0 else { throw LiveError.platform("弹幕需要在 1 到 30 个字之间") }
+        let url = try endpoint(base + "/msg/send")
+        let parameters = ["roomid": roomID, "msg": message, "color": "16777215", "fontsize": "25", "mode": "1", "rnd": String(Int(Date().timeIntervalSince1970)), "csrf": credentials.csrf, "csrf_token": credentials.csrf]
+        let body = formBody(parameters)
+        let response = try await client.post(url, body: body, headers: try await headers())
+        guard !response["code"].isNull else { throw LiveError.invalidResponse }
+        guard response["code"].int == 0 else { throw LiveError.platform(response["message"].string.isEmpty ? response["msg"].string : response["message"].string) }
     }
 
     private func request(_ path: String, query: [String: String], signed: Bool = false) async throws -> JSONValue {
@@ -145,10 +163,10 @@ public actor BilibiliProvider: LiveProvider {
         guard let canonical, let room = Int(canonical) else { throw LiveError.invalidResponse }
         let data = try await request("/xlive/web-room/v1/index/getDanmuInfo", query: ["id": canonical, "type": "0"], signed: true)
         guard let buvid else { throw LiveError.invalidResponse }
-        return try Self.chatEndpoint(roomID: room, token: data["token"].string, hosts: data["host_list"], buvid: buvid)
+        return try Self.chatEndpoint(roomID: room, token: data["token"].string, hosts: data["host_list"], buvid: buvid, credentials: credentials)
     }
 
-    public static func chatEndpoint(roomID: Int, token: String, hosts: JSONValue, buvid: String) throws -> LiveChatEndpoint {
+    public static func chatEndpoint(roomID: Int, token: String, hosts: JSONValue, buvid: String, credentials: BilibiliCredentials? = nil) throws -> LiveChatEndpoint {
         guard !token.isEmpty else { throw LiveError.invalidResponse }
         let urls = hosts.array.compactMap { host -> URL? in
             let name = host["host"].string
@@ -160,12 +178,19 @@ public actor BilibiliProvider: LiveProvider {
             urls: urls.isEmpty ? [URL(string: "wss://\(BilibiliChatCodec.fallbackHost)/sub")!] : urls,
             headers: [
                 "User-Agent": HTTPClient.userAgent, "Origin": "https://live.bilibili.com",
-                "Cookie": "buvid3=\(buvid);"
+                "Cookie": "buvid3=\(buvid);" + (credentials?.cookie ?? "")
             ],
-            handshake: try BilibiliChatCodec.handshake(roomID: roomID, token: token, buvid: buvid),
+            handshake: try BilibiliChatCodec.handshake(roomID: roomID, token: token, buvid: buvid, uid: credentials?.uid ?? 0),
             heartbeat: BilibiliChatCodec.heartbeat(),
             heartbeatInterval: 30,
             decode: { try BilibiliChatCodec.decode($0) }
         )
     }
+}
+
+public struct BilibiliCredentials: Codable, Sendable {
+    public let cookie: String
+    public let csrf: String
+    public let uid: Int
+    public init(cookie: String, csrf: String, uid: Int) { self.cookie = cookie; self.csrf = csrf; self.uid = uid }
 }

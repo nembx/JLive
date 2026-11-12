@@ -20,7 +20,6 @@ struct BrowseView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     header.padding(.horizontal, 20)
                     if isSearch { searchField.padding(.horizontal, 20) }
-                    else { hero.padding(.horizontal, 20) }
                     PlatformPicker(selection: $model.selectedPlatform)
                     content.padding(.horizontal, 20)
                 }
@@ -42,6 +41,7 @@ struct BrowseView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 7) {
+                    if !isSearch { Image("BrandMark").resizable().frame(width: 42, height: 42).clipShape(RoundedRectangle(cornerRadius: 12)) }
                     Text(isSearch ? "找到你的热爱" : "JLive").font(.system(size: isSearch ? 27 : 34, weight: .heavy, design: .rounded))
                     if !isSearch {
                         Text("LIVE").font(.system(size: 9, weight: .heavy, design: .monospaced))
@@ -59,30 +59,6 @@ struct BrowseView: View {
             }
             .accessibilityLabel("打开直播间链接")
         }
-    }
-
-    private var hero: some View {
-        ZStack(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 22).fill(Color(red: 0.10, green: 0.14, blue: 0.10))
-            HStack {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 5) {
-                        Circle().fill(JLiveTheme.lime).frame(width: 5, height: 5)
-                        Text("随时打开 · 即刻相遇").font(.system(size: 10, weight: .medium)).tracking(1).foregroundStyle(JLiveTheme.lime)
-                    }
-                    Text("每一种热爱\n都有正在发生的精彩。")
-                        .font(.system(size: 21, weight: .bold)).foregroundStyle(.white).lineSpacing(4)
-                    Text("游戏 / 音乐 / 陪伴 / 生活").font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
-                }
-                Spacer(minLength: 4)
-                Image(systemName: "play.rectangle.on.rectangle.fill")
-                    .font(.system(size: 53, weight: .light)).foregroundStyle(JLiveTheme.lime)
-                    .rotationEffect(.degrees(-9)).padding(.trailing, 5)
-                    .accessibilityHidden(true)
-            }
-            .padding(23)
-        }
-        .frame(minHeight: 165)
     }
 
     private var searchField: some View {

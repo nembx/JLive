@@ -42,6 +42,13 @@ public enum JSONValue: Decodable, Sendable {
 
 public protocol HTTPRequesting: Sendable {
     func get(_ url: URL, headers: [String: String]) async throws -> JSONValue
+    func text(_ url: URL, headers: [String: String]) async throws -> String
+    func post(_ url: URL, body: String, headers: [String: String]) async throws -> JSONValue
+}
+
+public extension HTTPRequesting {
+    func text(_ url: URL, headers: [String: String]) async throws -> String { throw LiveError.unsupported }
+    func post(_ url: URL, body: String, headers: [String: String]) async throws -> JSONValue { throw LiveError.unsupported }
 }
 
 public actor HTTPClient: HTTPRequesting {
@@ -56,13 +63,36 @@ public actor HTTPClient: HTTPRequesting {
     }
 
     public func get(_ url: URL, headers: [String: String] = [:]) async throws -> JSONValue {
+        let request = URLRequest(url: url)
+        return try decode(await data(request, headers: headers))
+    }
+
+    public func text(_ url: URL, headers: [String: String] = [:]) async throws -> String {
+        let bytes = try await data(URLRequest(url: url), headers: headers)
+        guard let value = String(data: bytes, encoding: .utf8) else { throw LiveError.invalidResponse }
+        return value
+    }
+
+    public func post(_ url: URL, body: String, headers: [String: String] = [:]) async throws -> JSONValue {
         var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = Data(body.utf8)
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        return try decode(await data(request, headers: headers))
+    }
+
+    private func data(_ original: URLRequest, headers: [String: String]) async throws -> Data {
+        var request = original
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
         let (data, response) = try await session.data(for: request)
         try Task.checkCancellation()
         guard let response = response as? HTTPURLResponse else { throw LiveError.invalidResponse }
         guard (200..<300).contains(response.statusCode) else { throw LiveError.http(response.statusCode) }
+        return data
+    }
+
+    private func decode(_ data: Data) throws -> JSONValue {
         do {
             let value = try JSONDecoder().decode(JSONValue.self, from: data)
             // A few Huya endpoints return JSON encoded inside a JSON string.
@@ -81,6 +111,13 @@ func endpoint(_ base: String, _ query: [String: String] = [:]) throws -> URL {
     components.queryItems = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
     guard let url = components.url else { throw LiveError.invalidResponse }
     return url
+}
+
+func formBody(_ parameters: [String: String]) -> String {
+    let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")
+    return parameters.sorted { $0.key < $1.key }.map {
+        "\($0.key.addingPercentEncoding(withAllowedCharacters: allowed)!)=\($0.value.addingPercentEncoding(withAllowedCharacters: allowed)!)"
+    }.joined(separator: "&")
 }
 
 func imageURL(_ value: String) -> URL? {

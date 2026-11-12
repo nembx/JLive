@@ -34,7 +34,7 @@ struct LibraryView: View {
                     if rooms.isEmpty {
                         EmptyState(symbol: showingHistory ? "clock" : "heart", title: showingHistory ? "还没有观看记录" : "收藏你的第一个直播间", message: "打开直播间后点击爱心收藏，\n也可以直接添加直播间链接。")
                     } else {
-                        Text(showingHistory ? "最近打开的直播间，按时间排列" : "长按卡片可取消收藏，开播状态以进入直播间后为准")
+                        Text(showingHistory ? "最近打开的直播间，按时间排列" : (library.refreshMessage ?? "下拉刷新开播状态，长按卡片管理收藏"))
                             .font(.caption).foregroundStyle(.secondary)
                         RoomGrid(rooms: rooms, service: service)
                     }
@@ -42,9 +42,10 @@ struct LibraryView: View {
                 .padding(20)
             }
             .background(JLiveTheme.background)
+            .refreshable { await library.refresh(using: service) }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingAddRoom) {
-                AddRoomSheet { room in library.toggle(room); directRoom = room }
+                AddRoomSheet { room in if !library.contains(room) { library.toggle(room) }; directRoom = room }
                     .presentationDetents([.medium])
             }
             .navigationDestination(item: $directRoom) { room in RoomDetailView(room: room, service: service) }

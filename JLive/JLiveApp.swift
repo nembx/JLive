@@ -5,9 +5,11 @@ import JLiveCore
 struct JLiveApp: App {
     @State private var library = LibraryStore()
     @State private var externalRoom: LiveRoom?
+    @State private var account: AccountStore
     private let service = LiveService.standard()
 
     init() {
+        _account = State(initialValue: AccountStore(service: service))
         #if DEBUG
         if let index = CommandLine.arguments.firstIndex(of: "--open-room"),
            CommandLine.arguments.indices.contains(index + 1),
@@ -31,6 +33,7 @@ struct JLiveApp: App {
             }
             .tint(JLiveTheme.accent)
             .environment(library)
+            .environment(account)
             .preferredColorScheme(library.appearance.colorScheme)
             .onOpenURL { url in
                 guard url.scheme == "jlive", let platform = LivePlatform(rawValue: url.host ?? ""),
@@ -44,6 +47,9 @@ struct JLiveApp: App {
                         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("完成") { externalRoom = nil } } }
                 }
                 .environment(library)
+                .environment(account)
+                .preferredColorScheme(library.appearance.colorScheme)
+                .tint(JLiveTheme.accent)
             }
         }
     }

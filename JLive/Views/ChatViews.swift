@@ -10,13 +10,14 @@ struct DanmakuOverlay: View {
             ZStack(alignment: .topLeading) {
                 ForEach(chat.floating) { item in
                     DanmakuLabel(item: item, containerWidth: proxy.size.width) { chat.expire(item.id) }
-                        .offset(y: 8 + CGFloat(item.lane) * ChatModel.laneHeight)
+                        .offset(y: 8 + CGFloat(item.lane) * chat.laneHeight)
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
             .onChange(of: proxy.size, initial: true) { _, size in chat.viewport = size }
         }
         .clipped()
+        .opacity(chat.opacity)
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -31,7 +32,7 @@ private struct DanmakuLabel: View {
 
     var body: some View {
         Text(item.text)
-            .font(.system(size: 15, weight: .semibold))
+            .font(.system(size: item.fontSize, weight: .semibold))
             .lineLimit(1)
             .fixedSize()
             .foregroundStyle(item.isSuperChat ? Color.black : color)
@@ -74,13 +75,6 @@ struct ChatPanel: View {
                 Text("聊天").font(.system(size: 15, weight: .bold))
                 statusLabel
                 Spacer()
-                Button { chat.showsFloating.toggle() } label: {
-                    Image(systemName: chat.showsFloating ? "captions.bubble.fill" : "captions.bubble")
-                        .font(.system(size: 16))
-                        .foregroundStyle(chat.showsFloating ? JLiveTheme.accent : Color.secondary)
-                        .frame(width: 36, height: 30)
-                }
-                .accessibilityLabel(chat.showsFloating ? "关闭画面弹幕" : "开启画面弹幕")
             }
             .padding(.leading, 15).padding(.trailing, 8).padding(.vertical, 8)
             Divider()

@@ -7,40 +7,84 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		06AB17A37D0475A97D1A9E30 /* JLiveCore in Frameworks */ = {isa = PBXBuildFile; productRef = 599CA41BC1F9925A4606739A /* JLiveCore */; };
+		348CB6E6B42E12049EC4D16D /* LibraryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A53A38479AC1340F24831A1 /* LibraryStoreTests.swift */; };
 		35316522142CF8DE7F844AE8 /* ChatViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0AB278B123B48613A498D6B /* ChatViews.swift */; };
+		4215904E50D7E4677356AB48 /* LibraryBackupDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73733D8D7EA6C20B0D52ED4E /* LibraryBackupDocument.swift */; };
+		471BF3428CD3438C5C36F633 /* PlayerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CCE6CF838E3BEAEB6055979 /* PlayerUITests.swift */; };
 		6793B0879EBCDD8E9DE660F2 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 973BFC7C05E539B2A7B63D36 /* LICENSE */; };
 		6F5C7DE8894BAC1B474CDA71 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F4D2E3180E8D700F400DB18 /* SettingsView.swift */; };
 		7A2E59754520BDB53C44D39B /* RoomDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEB0CA39D5DA2FD00F26F92E /* RoomDetailView.swift */; };
 		80915E9D8AC864CFBDD8BD85 /* BrowseModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9192AECA3CFD557E9C6E4EAD /* BrowseModel.swift */; };
 		8253933397DCF6BA1B80ADA4 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18001267F7FEAD9156EC39FF /* LibraryView.swift */; };
+		8366438395ED56BB2531D5CE /* LivePlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9043BBC4AFDFF9E4C3007C3E /* LivePlayerView.swift */; };
+		A703BAC3A50532E974917B3A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 949DF03F7FF8F617160D266D /* Assets.xcassets */; };
 		AF0EDAAD002AB867937897E1 /* BrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DA8155B8CB3CB194D1A7140 /* BrowseView.swift */; };
 		BDA9F8BC9013EFE95C13D399 /* PlayerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F541742BA24955DD772DC6ED /* PlayerModel.swift */; };
+		CB0463C6273C80F2C9695146 /* BilibiliLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 400EB3CEAC39CBAE35A9CC56 /* BilibiliLoginView.swift */; };
 		D9905B4C884E3592A936EA13 /* JLiveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976CB76C96A5F33F8191AFAB /* JLiveApp.swift */; };
 		DC9DAC99FC3396029BFD0AA4 /* JLiveCore in Frameworks */ = {isa = PBXBuildFile; productRef = BDFBB56E718136750A261EEC /* JLiveCore */; };
+		E1EBC9A3E0D1A6F3CCDD9BEB /* ChatComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A3256B97F98B2C4335B784 /* ChatComposer.swift */; };
+		E3D7FD059E3B18694AB9C6D8 /* AccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A94717F23D96A11BA082DB8 /* AccountStore.swift */; };
 		F1C928469A666DF8F5081ED0 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92590DEB1507ED9BBA235F1C /* Components.swift */; };
 		F2BB96937D17FDB05263AA8C /* ChatModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 082B2C68D6E961B7FEDF9996 /* ChatModel.swift */; };
 		F5512F3E3E85518C20F8EAF8 /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1F9403A5889FD42E161449 /* LibraryStore.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		67EEECEE69B17287817D1B58 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3587BF82968045A612FBF04B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A4F50D3D379D5F379D0BE0CD;
+			remoteInfo = JLive;
+		};
+		D73B905D98B0EAB54B56ECDB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3587BF82968045A612FBF04B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A4F50D3D379D5F379D0BE0CD;
+			remoteInfo = JLive;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		082B2C68D6E961B7FEDF9996 /* ChatModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatModel.swift; sourceTree = "<group>"; };
 		18001267F7FEAD9156EC39FF /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		1A53A38479AC1340F24831A1 /* LibraryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStoreTests.swift; sourceTree = "<group>"; };
+		1A94717F23D96A11BA082DB8 /* AccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountStore.swift; sourceTree = "<group>"; };
 		20D2324CF80AE9BA07693C7D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2CCE6CF838E3BEAEB6055979 /* PlayerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerUITests.swift; sourceTree = "<group>"; };
 		2F1F9403A5889FD42E161449 /* LibraryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStore.swift; sourceTree = "<group>"; };
+		400EB3CEAC39CBAE35A9CC56 /* BilibiliLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BilibiliLoginView.swift; sourceTree = "<group>"; };
+		49405C5AF426CF9DC8CA0BA7 /* JLiveTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = JLiveTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4DA8155B8CB3CB194D1A7140 /* BrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseView.swift; sourceTree = "<group>"; };
 		4F4D2E3180E8D700F400DB18 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		73733D8D7EA6C20B0D52ED4E /* LibraryBackupDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryBackupDocument.swift; sourceTree = "<group>"; };
+		9043BBC4AFDFF9E4C3007C3E /* LivePlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePlayerView.swift; sourceTree = "<group>"; };
 		90B7EFC2D3DC00A555A912C0 /* JLive.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = JLive.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9192AECA3CFD557E9C6E4EAD /* BrowseModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseModel.swift; sourceTree = "<group>"; };
 		92590DEB1507ED9BBA235F1C /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		949DF03F7FF8F617160D266D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		973BFC7C05E539B2A7B63D36 /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
 		976CB76C96A5F33F8191AFAB /* JLiveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JLiveApp.swift; sourceTree = "<group>"; };
 		A0AB278B123B48613A498D6B /* ChatViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViews.swift; sourceTree = "<group>"; };
 		C1BF66CAF54D2079C333DB37 /* JLiveCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = JLiveCore; path = JLiveCore; sourceTree = SOURCE_ROOT; };
+		E59F96362E361AB1DD9BE0DC /* JLiveUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = JLiveUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EEB0CA39D5DA2FD00F26F92E /* RoomDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomDetailView.swift; sourceTree = "<group>"; };
+		F4A3256B97F98B2C4335B784 /* ChatComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatComposer.swift; sourceTree = "<group>"; };
 		F541742BA24955DD772DC6ED /* PlayerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		8E624D8DB7242C40B3FC5B6F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				06AB17A37D0475A97D1A9E30 /* JLiveCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C624C24B8772CACA5A417922 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -65,14 +109,25 @@
 			children = (
 				973BFC7C05E539B2A7B63D36 /* LICENSE */,
 				A1B0E9FD2F790767CF104F15 /* JLive */,
+				8F4E20565D57ED235BAACC61 /* JLiveTests */,
+				694E26570A9BCE23B13CD97C /* JLiveUITests */,
 				30ABE77749D0B74A68B7A0A7 /* Packages */,
 				C94219A2EA4B1F2E4A57DFB8 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
+		694E26570A9BCE23B13CD97C /* JLiveUITests */ = {
+			isa = PBXGroup;
+			children = (
+				2CCE6CF838E3BEAEB6055979 /* PlayerUITests.swift */,
+			);
+			path = JLiveUITests;
+			sourceTree = "<group>";
+		};
 		7BF8B83D2E36D4AA54C3FA9C /* State */ = {
 			isa = PBXGroup;
 			children = (
+				1A94717F23D96A11BA082DB8 /* AccountStore.swift */,
 				9192AECA3CFD557E9C6E4EAD /* BrowseModel.swift */,
 				082B2C68D6E961B7FEDF9996 /* ChatModel.swift */,
 				2F1F9403A5889FD42E161449 /* LibraryStore.swift */,
@@ -81,9 +136,18 @@
 			path = State;
 			sourceTree = "<group>";
 		};
+		8F4E20565D57ED235BAACC61 /* JLiveTests */ = {
+			isa = PBXGroup;
+			children = (
+				1A53A38479AC1340F24831A1 /* LibraryStoreTests.swift */,
+			);
+			path = JLiveTests;
+			sourceTree = "<group>";
+		};
 		A1B0E9FD2F790767CF104F15 /* JLive */ = {
 			isa = PBXGroup;
 			children = (
+				949DF03F7FF8F617160D266D /* Assets.xcassets */,
 				20D2324CF80AE9BA07693C7D /* Info.plist */,
 				976CB76C96A5F33F8191AFAB /* JLiveApp.swift */,
 				7BF8B83D2E36D4AA54C3FA9C /* State */,
@@ -96,6 +160,8 @@
 			isa = PBXGroup;
 			children = (
 				90B7EFC2D3DC00A555A912C0 /* JLive.app */,
+				49405C5AF426CF9DC8CA0BA7 /* JLiveTests.xctest */,
+				E59F96362E361AB1DD9BE0DC /* JLiveUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -103,10 +169,14 @@
 		CB5F41D58D911E1198494BDE /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				400EB3CEAC39CBAE35A9CC56 /* BilibiliLoginView.swift */,
 				4DA8155B8CB3CB194D1A7140 /* BrowseView.swift */,
+				F4A3256B97F98B2C4335B784 /* ChatComposer.swift */,
 				A0AB278B123B48613A498D6B /* ChatViews.swift */,
 				92590DEB1507ED9BBA235F1C /* Components.swift */,
+				73733D8D7EA6C20B0D52ED4E /* LibraryBackupDocument.swift */,
 				18001267F7FEAD9156EC39FF /* LibraryView.swift */,
+				9043BBC4AFDFF9E4C3007C3E /* LivePlayerView.swift */,
 				EEB0CA39D5DA2FD00F26F92E /* RoomDetailView.swift */,
 				4F4D2E3180E8D700F400DB18 /* SettingsView.swift */,
 			);
@@ -116,6 +186,26 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		98107636E7F5DB4CBE4E2B66 /* JLiveTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 21C27D2EA325FD997BE55D0A /* Build configuration list for PBXNativeTarget "JLiveTests" */;
+			buildPhases = (
+				3C78FB04EB40B6F58C44387E /* Sources */,
+				8E624D8DB7242C40B3FC5B6F /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EB93409FAA717A2394183287 /* PBXTargetDependency */,
+			);
+			name = JLiveTests;
+			packageProductDependencies = (
+				599CA41BC1F9925A4606739A /* JLiveCore */,
+			);
+			productName = JLiveTests;
+			productReference = 49405C5AF426CF9DC8CA0BA7 /* JLiveTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		A4F50D3D379D5F379D0BE0CD /* JLive */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1068EDB56A4892CDA73B7C0F /* Build configuration list for PBXNativeTarget "JLive" */;
@@ -136,6 +226,24 @@
 			productReference = 90B7EFC2D3DC00A555A912C0 /* JLive.app */;
 			productType = "com.apple.product-type.application";
 		};
+		F86748972B286E84F0CECA55 /* JLiveUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AE0756CE0061D24FFDC1F392 /* Build configuration list for PBXNativeTarget "JLiveUITests" */;
+			buildPhases = (
+				5AE01BF9DB33277F7E0CB749 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				318842E7C52B8EC42EDDFAA8 /* PBXTargetDependency */,
+			);
+			name = JLiveUITests;
+			packageProductDependencies = (
+			);
+			productName = JLiveUITests;
+			productReference = E59F96362E361AB1DD9BE0DC /* JLiveUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -145,8 +253,15 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					98107636E7F5DB4CBE4E2B66 = {
+						DevelopmentTeam = "";
+					};
 					A4F50D3D379D5F379D0BE0CD = {
 						DevelopmentTeam = "";
+					};
+					F86748972B286E84F0CECA55 = {
+						DevelopmentTeam = "";
+						TestTargetID = A4F50D3D379D5F379D0BE0CD;
 					};
 				};
 			};
@@ -168,6 +283,8 @@
 			projectRoot = "";
 			targets = (
 				A4F50D3D379D5F379D0BE0CD /* JLive */,
+				F86748972B286E84F0CECA55 /* JLiveUITests */,
+				98107636E7F5DB4CBE4E2B66 /* JLiveTests */,
 			);
 		};
 /* End PBXProject section */
@@ -177,6 +294,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A703BAC3A50532E974917B3A /* Assets.xcassets in Resources */,
 				6793B0879EBCDD8E9DE660F2 /* LICENSE in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -184,18 +302,39 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		3C78FB04EB40B6F58C44387E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				348CB6E6B42E12049EC4D16D /* LibraryStoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5AE01BF9DB33277F7E0CB749 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				471BF3428CD3438C5C36F633 /* PlayerUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A275B4467BB294B30142B8AF /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E3D7FD059E3B18694AB9C6D8 /* AccountStore.swift in Sources */,
+				CB0463C6273C80F2C9695146 /* BilibiliLoginView.swift in Sources */,
 				80915E9D8AC864CFBDD8BD85 /* BrowseModel.swift in Sources */,
 				AF0EDAAD002AB867937897E1 /* BrowseView.swift in Sources */,
+				E1EBC9A3E0D1A6F3CCDD9BEB /* ChatComposer.swift in Sources */,
 				F2BB96937D17FDB05263AA8C /* ChatModel.swift in Sources */,
 				35316522142CF8DE7F844AE8 /* ChatViews.swift in Sources */,
 				F1C928469A666DF8F5081ED0 /* Components.swift in Sources */,
 				D9905B4C884E3592A936EA13 /* JLiveApp.swift in Sources */,
+				4215904E50D7E4677356AB48 /* LibraryBackupDocument.swift in Sources */,
 				F5512F3E3E85518C20F8EAF8 /* LibraryStore.swift in Sources */,
 				8253933397DCF6BA1B80ADA4 /* LibraryView.swift in Sources */,
+				8366438395ED56BB2531D5CE /* LivePlayerView.swift in Sources */,
 				BDA9F8BC9013EFE95C13D399 /* PlayerModel.swift in Sources */,
 				7A2E59754520BDB53C44D39B /* RoomDetailView.swift in Sources */,
 				6F5C7DE8894BAC1B474CDA71 /* SettingsView.swift in Sources */,
@@ -204,7 +343,37 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		318842E7C52B8EC42EDDFAA8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A4F50D3D379D5F379D0BE0CD /* JLive */;
+			targetProxy = D73B905D98B0EAB54B56ECDB /* PBXContainerItemProxy */;
+		};
+		EB93409FAA717A2394183287 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A4F50D3D379D5F379D0BE0CD /* JLive */;
+			targetProxy = 67EEECEE69B17287817D1B58 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		1F43347F4ACB41810DDE5B90 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.nembx.JLiveTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JLive.app/JLive";
+			};
+			name = Debug;
+		};
 		5B5BC7C57141296EBF9FF94A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -284,7 +453,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -320,6 +489,40 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
+		};
+		81C227702FB654BE27095525 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.nembx.JLiveUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = JLive;
+			};
+			name = Release;
+		};
+		9F5DA419D59E64A25EE1186B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.nembx.JLiveUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = JLive;
+			};
+			name = Debug;
 		};
 		B09C6C20987C18B8260A599D /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -369,7 +572,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -377,6 +580,23 @@
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		BBC0FFE9FC222DEFC1F3BCD2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.nembx.JLiveTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JLive.app/JLive";
 			};
 			name = Release;
 		};
@@ -392,11 +612,29 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		21C27D2EA325FD997BE55D0A /* Build configuration list for PBXNativeTarget "JLiveTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F43347F4ACB41810DDE5B90 /* Debug */,
+				BBC0FFE9FC222DEFC1F3BCD2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		568EBA7C695349806F412E5C /* Build configuration list for PBXProject "JLive" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				79D92EDDDDB22427CC962103 /* Debug */,
 				B09C6C20987C18B8260A599D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AE0756CE0061D24FFDC1F392 /* Build configuration list for PBXNativeTarget "JLiveUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9F5DA419D59E64A25EE1186B /* Debug */,
+				81C227702FB654BE27095525 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -411,6 +649,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		599CA41BC1F9925A4606739A /* JLiveCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = JLiveCore;
+		};
 		BDFBB56E718136750A261EEC /* JLiveCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = JLiveCore;
