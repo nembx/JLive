@@ -10,6 +10,7 @@
 		06AB17A37D0475A97D1A9E30 /* JLiveCore in Frameworks */ = {isa = PBXBuildFile; productRef = 599CA41BC1F9925A4606739A /* JLiveCore */; };
 		348CB6E6B42E12049EC4D16D /* LibraryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A53A38479AC1340F24831A1 /* LibraryStoreTests.swift */; };
 		35316522142CF8DE7F844AE8 /* ChatViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0AB278B123B48613A498D6B /* ChatViews.swift */; };
+		3FCBE1EC019E68EBF4EF1265 /* BrowseModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB681713A39C4B0B3A18C3DF /* BrowseModelTests.swift */; };
 		4215904E50D7E4677356AB48 /* LibraryBackupDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73733D8D7EA6C20B0D52ED4E /* LibraryBackupDocument.swift */; };
 		471BF3428CD3438C5C36F633 /* PlayerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CCE6CF838E3BEAEB6055979 /* PlayerUITests.swift */; };
 		6793B0879EBCDD8E9DE660F2 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 973BFC7C05E539B2A7B63D36 /* LICENSE */; };
@@ -71,6 +72,7 @@
 		A0AB278B123B48613A498D6B /* ChatViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViews.swift; sourceTree = "<group>"; };
 		C1BF66CAF54D2079C333DB37 /* JLiveCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = JLiveCore; path = JLiveCore; sourceTree = SOURCE_ROOT; };
 		E59F96362E361AB1DD9BE0DC /* JLiveUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = JLiveUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EB681713A39C4B0B3A18C3DF /* BrowseModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseModelTests.swift; sourceTree = "<group>"; };
 		EEB0CA39D5DA2FD00F26F92E /* RoomDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomDetailView.swift; sourceTree = "<group>"; };
 		F4A3256B97F98B2C4335B784 /* ChatComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatComposer.swift; sourceTree = "<group>"; };
 		F541742BA24955DD772DC6ED /* PlayerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerModel.swift; sourceTree = "<group>"; };
@@ -139,6 +141,7 @@
 		8F4E20565D57ED235BAACC61 /* JLiveTests */ = {
 			isa = PBXGroup;
 			children = (
+				EB681713A39C4B0B3A18C3DF /* BrowseModelTests.swift */,
 				1A53A38479AC1340F24831A1 /* LibraryStoreTests.swift */,
 			);
 			path = JLiveTests;
@@ -306,6 +309,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3FCBE1EC019E68EBF4EF1265 /* BrowseModelTests.swift in Sources */,
 				348CB6E6B42E12049EC4D16D /* LibraryStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -453,7 +457,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -572,7 +576,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

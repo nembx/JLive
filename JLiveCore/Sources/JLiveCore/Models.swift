@@ -26,9 +26,10 @@ public enum LivePlatform: String, CaseIterable, Codable, Identifiable, Sendable 
         case .douyin: URL(string: "https://live.douyin.com")!
         }
     }
-    public var supportsDiscovery: Bool { self != .douyin }
-    public var supportsNativePlayback: Bool { self != .douyin }
-    public var supportsChat: Bool { self != .douyin }
+    public var supportsDiscovery: Bool { true }
+    public var supportsSearch: Bool { self != .douyin }
+    public var supportsNativePlayback: Bool { true }
+    public var supportsChat: Bool { true }
 
     public func roomURL(_ roomID: String) -> URL {
         homeURL.appendingPathComponent(roomID)

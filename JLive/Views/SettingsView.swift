@@ -51,7 +51,7 @@ struct SettingsView: View {
                         HStack {
                             PlatformBadge(platform: platform)
                             Spacer()
-                            Text(platform.supportsNativePlayback ? "原生播放 / 弹幕 / 搜索" : "官网观看 / 链接收藏")
+                            Text(platform.supportsSearch ? "原生播放 / 弹幕 / 搜索" : "原生播放 / 弹幕 / 推荐")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }

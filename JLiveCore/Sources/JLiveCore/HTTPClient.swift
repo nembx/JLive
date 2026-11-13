@@ -33,6 +33,10 @@ public enum JSONValue: Decodable, Sendable {
         guard case .array(let value) = self else { return [] }
         return value
     }
+    public var object: [String: JSONValue] {
+        guard case .object(let value) = self else { return [:] }
+        return value
+    }
     public var isNull: Bool { if case .null = self { true } else { false } }
     public func requiredArray() throws -> [JSONValue] {
         guard case .array(let value) = self else { throw LiveError.invalidResponse }
@@ -44,11 +48,13 @@ public protocol HTTPRequesting: Sendable {
     func get(_ url: URL, headers: [String: String]) async throws -> JSONValue
     func text(_ url: URL, headers: [String: String]) async throws -> String
     func post(_ url: URL, body: String, headers: [String: String]) async throws -> JSONValue
+    func cookies(for url: URL) async -> String
 }
 
 public extension HTTPRequesting {
     func text(_ url: URL, headers: [String: String]) async throws -> String { throw LiveError.unsupported }
     func post(_ url: URL, body: String, headers: [String: String]) async throws -> JSONValue { throw LiveError.unsupported }
+    func cookies(for url: URL) async -> String { "" }
 }
 
 public actor HTTPClient: HTTPRequesting {
@@ -79,6 +85,10 @@ public actor HTTPClient: HTTPRequesting {
         request.httpBody = Data(body.utf8)
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         return try decode(await data(request, headers: headers))
+    }
+
+    public func cookies(for url: URL) async -> String {
+        (session.configuration.httpCookieStorage?.cookies(for: url) ?? []).map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
     }
 
     private func data(_ original: URLRequest, headers: [String: String]) async throws -> Data {

@@ -75,13 +75,8 @@ struct BrowseView: View {
     }
 
     @ViewBuilder private var content: some View {
-        if model.selectedPlatform == .douyin {
-            VStack {
-                EmptyState(symbol: "music.note", title: "抖音直播", message: "前往抖音发现正在直播的主播，也可以通过右上角添加直播间链接。")
-                Link(destination: LivePlatform.douyin.homeURL) { Label("打开抖音直播", systemImage: "arrow.up.right") }
-                    .buttonStyle(.borderedProminent)
-            }
-            .frame(maxWidth: .infinity)
+        if isSearch && model.selectedPlatform?.supportsSearch == false {
+            EmptyState(symbol: "link", title: "通过链接打开抖音直播", message: "抖音暂不支持关键词搜索\n点右上角粘贴直播间链接或输入房间号")
         } else if isSearch && model.keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             EmptyState(symbol: "magnifyingglass", title: "下一场精彩，从搜索开始", message: "同时搜索 B站、虎牙和斗鱼\n也可以选择一个平台精准查找")
         } else {

@@ -2,6 +2,46 @@ import XCTest
 
 @MainActor
 final class PlayerUITests: XCTestCase {
+    func testDouyinNativePlayerIsMutedAndOffersChatSettings() throws {
+        guard let roomID = ProcessInfo.processInfo.environment["JLIVE_DOUYIN_UI_ROOM"] else {
+            throw XCTSkip("设置 JLIVE_DOUYIN_UI_ROOM 验证正在直播的抖音房间")
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["--muted", "--open-room", "https://live.douyin.com/\(roomID)"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["暂停"].waitForExistence(timeout: 25), "HLS 应进入实际播放状态")
+        XCTAssertTrue(app.buttons["开启声音"].exists, "测试期间应保持静音")
+        XCTAssertTrue(app.staticTexts["实时"].waitForExistence(timeout: 15), "应收到弹幕服务端推送")
+        let settings = app.buttons["播放器设置"]
+        if !settings.exists { app.otherElements["videoSurface"].tap() }
+        XCTAssertTrue(settings.exists)
+        XCTAssertTrue(app.buttons["切换清晰度"].exists)
+        settings.tap()
+        XCTAssertTrue(app.switches["画面弹幕"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.sliders["不透明度"].exists)
+        app.buttons["关闭设置"].tap()
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "抖音原生播放与聊天"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        app.buttons["完成"].tap()
+        XCTAssertFalse(app.buttons["全屏播放"].exists)
+    }
+
+    func testDouyinSearchOffersDirectRoomOpening() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--muted"]
+        app.launch()
+        defer { app.terminate() }
+        app.tabBars.buttons["搜索"].tap()
+        app.buttons["抖音"].tap()
+        XCTAssertTrue(app.staticTexts["通过链接打开抖音直播"].waitForExistence(timeout: 4))
+        app.buttons["打开直播间链接"].tap()
+        XCTAssertTrue(app.buttons["打开直播间"].waitForExistence(timeout: 4))
+        app.buttons["取消"].tap()
+    }
+
     func testFullscreenKeepsSettingsAndReturnsToInlinePlayer() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--muted", "--open-room", "https://live.bilibili.com/545068"]

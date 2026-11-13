@@ -129,6 +129,19 @@ struct ChatTests {
         #expect(await eventually { socket.closed })
     }
 
+    @Test func sendsAcknowledgementBeforePublishingMessages() async throws {
+        let socket = FakeSocket(frames: [.success(Data("batch".utf8))])
+        let endpoint = LiveChatEndpoint(urls: [URL(string: "wss://a.example.com/sub")!],
+            handshake: Data("hello".utf8), heartbeat: Data("ping".utf8),
+            process: { _ in LiveChatFrame(events: [chat("message")], replies: [Data("ack".utf8)]) })
+        for try await event in LiveChatClient(connector: FakeConnector([.success(socket)])).events(endpoint) {
+            #expect(event == chat("message"))
+            #expect(socket.sent == [Data("hello".utf8), Data("ack".utf8)])
+            break
+        }
+        #expect(await eventually { socket.closed })
+    }
+
     @Test func clientReconnectsOnTheNextHostAfterLosingTheConnection() async throws {
         let first = FakeSocket(frames: [.success(Data("ready".utf8)), .failure(URLError(.networkConnectionLost))])
         let second = FakeSocket(frames: [.success(Data("ready".utf8)), .success(Data("back".utf8))])

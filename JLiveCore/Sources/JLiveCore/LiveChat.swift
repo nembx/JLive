@@ -30,6 +30,17 @@ public enum LiveChatEvent: Equatable, Sendable {
     case message(LiveChatMessage)
 }
 
+/// Decoded events and any protocol acknowledgements required before publishing them.
+public struct LiveChatFrame: Sendable {
+    public let events: [LiveChatEvent]
+    public let replies: [Data]
+
+    public init(events: [LiveChatEvent], replies: [Data] = []) {
+        self.events = events
+        self.replies = replies
+    }
+}
+
 /// Everything needed to open and keep alive a room chat connection.
 ///
 /// Providers build this from their own API responses; the transport and the
@@ -42,7 +53,10 @@ public struct LiveChatEndpoint: Sendable {
     public let handshake: Data
     public let heartbeat: Data
     public let heartbeatInterval: TimeInterval
-    public let decode: @Sendable (Data) throws -> [LiveChatEvent]
+    public let process: @Sendable (Data) throws -> LiveChatFrame
+    public var decode: @Sendable (Data) throws -> [LiveChatEvent] {
+        { try process($0).events }
+    }
 
     public init(
         urls: [URL],
@@ -58,7 +72,24 @@ public struct LiveChatEndpoint: Sendable {
         self.handshake = handshake
         self.heartbeat = heartbeat
         self.heartbeatInterval = heartbeatInterval
-        self.decode = decode
+        self.process = { LiveChatFrame(events: try decode($0)) }
+    }
+
+    public init(
+        urls: [URL],
+        headers: [String: String] = [:],
+        handshake: Data,
+        heartbeat: Data,
+        heartbeatInterval: TimeInterval = 30,
+        process: @escaping @Sendable (Data) throws -> LiveChatFrame
+    ) {
+        precondition(!urls.isEmpty, "A chat endpoint needs at least one host")
+        self.urls = urls
+        self.headers = headers
+        self.handshake = handshake
+        self.heartbeat = heartbeat
+        self.heartbeatInterval = heartbeatInterval
+        self.process = process
     }
 }
 
@@ -176,8 +207,10 @@ public struct LiveChatClient: Sendable {
             do {
                 while true {
                     let frame = try await socket.receive()
+                    let decoded = try endpoint.process(frame)
+                    for reply in decoded.replies { try await socket.send(reply) }
                     failures = 0
-                    for event in try endpoint.decode(frame) { yield(event) }
+                    for event in decoded.events { yield(event) }
                 }
             } catch {
                 group.cancelAll()

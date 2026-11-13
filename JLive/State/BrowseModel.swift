@@ -32,13 +32,13 @@ final class BrowseModel {
         isLoading = false
         isLoadingMore = false
         page = 1
-        guard selectedPlatform != .douyin else { return }
+        guard !isSearch || selectedPlatform?.supportsSearch != false else { return }
         guard !isSearch || !keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         isLoading = true
         defer { if generation == token { isLoading = false } }
         do {
             if isSearch { try await Task.sleep(for: .milliseconds(350)) }
-            let platforms = selectedPlatform.map { Set([$0]) } ?? Set(LivePlatform.allCases.filter(\.supportsDiscovery))
+            let platforms = selectedPlatform.map { Set([$0]) } ?? Set(LivePlatform.allCases.filter { isSearch ? $0.supportsSearch : $0.supportsDiscovery })
             let result = try await service.discover(platforms: platforms, keyword: isSearch ? keyword : "")
             guard generation == token else { return }
             rooms = result.rooms

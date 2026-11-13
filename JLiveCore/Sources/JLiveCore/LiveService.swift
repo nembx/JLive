@@ -36,7 +36,7 @@ public struct LiveService: Sendable {
 
     public static func standard() -> LiveService {
         let client = HTTPClient()
-        return LiveService(providers: [BilibiliProvider(client: client), HuyaProvider(client: client), DouyuProvider(client: client)])
+        return LiveService(providers: [BilibiliProvider(client: client), HuyaProvider(client: client), DouyuProvider(client: client), DouyinProvider(client: client)])
     }
 
     public func discover(platforms: Set<LivePlatform>, page: Int = 1, keyword: String = "") async throws -> DiscoveryResult {
