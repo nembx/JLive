@@ -3,6 +3,79 @@ import Testing
 @testable import JLiveCore
 
 struct DouyinTests {
+    @Test func searchDecodesLivePayloadsDeduplicatesAndUsesServerPagination() throws {
+        let payload = #"{"status_code":0,"has_more":true,"data":[{"lives":{"rawdata":"{\"id_str\":\"7376429659866598196\",\"owner\":{\"web_rid\":\"123\",\"nickname\":\"主播\"},\"title\":\"游戏直播\",\"stats\":{\"total_user\":9876}}"}},{"lives":{"rawdata":"{\"owner\":{\"web_rid\":\"123\"}}"}},{"lives":{"rawdata":"invalid"}}]}"#
+        let result = try DouyinProvider.parseSearch(json(payload))
+        #expect(result.rooms.map(\.roomID) == ["123"])
+        #expect(result.rooms.first?.title == "游戏直播")
+        #expect(result.rooms.first?.viewerCount == 9876)
+        #expect(result.rooms.first?.isLive == true)
+        #expect(result.hasMore)
+        #expect(try !DouyinProvider.parseSearch(json(#"{"status_code":0,"has_more":0,"data":[]}"#)).hasMore)
+        #expect(throws: LiveError.self) { try DouyinProvider.parseSearch(json(#"{"status_code":2483,"data":[]}"#)) }
+        #expect(throws: LiveError.self) { try DouyinProvider.parseSearch(json(#"{"status_code":0,"data":[{"new_shape":{}}]}"#)) }
+    }
+
+    @Test func searchRequestPreservesChineseKeywordAndCursor() throws {
+        let url = try DouyinProvider.searchURL(keyword: "游戏 + 音乐&直播", offset: "23", searchID: "search-log")
+        let items = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        #expect(items.first { $0.name == "keyword" }?.value == "游戏 + 音乐&直播")
+        #expect(items.first { $0.name == "offset" }?.value == "23")
+        #expect(items.first { $0.name == "search_id" }?.value == "search-log")
+        #expect(!items.contains { $0.name == "webid" })
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["JLIVE_DOUYIN_SEARCH_TESTS"] == "1" && ProcessInfo.processInfo.environment["JLIVE_DOUYIN_COOKIE"] != nil), .timeLimit(.minutes(1)))
+    func liveDouyinKeywordSearch() async throws {
+        let provider = DouyinProvider(client: HTTPClient())
+        await provider.setCredentials(DouyinCredentials(cookie: ProcessInfo.processInfo.environment["JLIVE_DOUYIN_COOKIE"] ?? ""))
+        let first = try await provider.search(keyword: "游戏", page: 1)
+        #expect(!first.rooms.isEmpty)
+        print("抖音关键词搜索：\(first.rooms.count) 个结果，后续页：\(first.hasMore)")
+        if first.hasMore {
+            let second = try await provider.search(keyword: "游戏", page: 2)
+            #expect(!second.rooms.isEmpty)
+            print("抖音搜索第二页：\(second.rooms.count) 个结果")
+        }
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["JLIVE_DOUYIN_SEARCH_TESTS"] == "1"), .timeLimit(.minutes(1)))
+    func liveDouyinGuestSearchRequestsLogin() async throws {
+        let provider = DouyinProvider(client: HTTPClient())
+        do {
+            let result = try await provider.search(keyword: "游戏", page: 1)
+            #expect(!result.rooms.isEmpty)
+            print("访客搜索可用：\(result.rooms.count) 个结果")
+        } catch LiveError.loginRequired(let platform) {
+            #expect(platform == .douyin)
+            print("抖音访客搜索要求官方登录（2483）")
+        }
+    }
+
+    @Test func authenticatedSearchUsesServerCursorAndClearsAccountOnLogout() async throws {
+        let client = DouyinSearchClient()
+        let provider = DouyinProvider(client: client)
+        await provider.setCredentials(DouyinCredentials(cookie: "sessionid=test-account; ttwid=account-guest"))
+        let first = try await provider.search(keyword: "游戏", page: 1)
+        #expect(first.rooms.map(\.roomID) == ["123"])
+        _ = try await provider.search(keyword: "游戏", page: 2)
+        let requests = await client.requests
+        #expect(requests.count == 2)
+        let second = URLComponents(url: requests[1].url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        #expect(second.first { $0.name == "offset" }?.value == "23")
+        #expect(second.first { $0.name == "search_id" }?.value == "server-search-id")
+        #expect(requests[0].cookie == "sessionid=test-account; ttwid=account-guest; nonce=guest")
+        await #expect(throws: LiveError.self) { try await provider.validateCredentials(DouyinCredentials(cookie: "sessionid=expired")) }
+        // A failed login attempt preserves the previous account.
+        _ = try await provider.search(keyword: "游戏", page: 1)
+        await provider.setCredentials(nil)
+        do {
+            _ = try await provider.search(keyword: "游戏", page: 1)
+            Issue.record("退出后应要求登录")
+        } catch LiveError.loginRequired(let platform) { #expect(platform == .douyin) }
+        #expect(await client.requests.last?.cookie == "ttwid=guest; nonce=guest")
+    }
+
     @Test func recommendationsDeduplicateWebIDsAndMapRoomState() throws {
         let page = try DouyinProvider.parseRecommendations(json(#"{"data":[{"web_rid":"123","room":{"title":"直播","status":2,"owner":{"nickname":"主播","avatar_thumb":{"url_list":["//img.example.com/a.jpg"]}},"room_view_stats":{"display_value":"456"}}},{"web_rid":"123","room":{}},{"web_rid":"invalid","room":{}}]}"#))
         #expect(page.rooms.count == 1)
@@ -172,4 +245,23 @@ private struct DouyinHTMLClient: HTTPRequesting {
     let html: String
     func get(_ url: URL, headers: [String: String]) async throws -> JSONValue { throw LiveError.http(403) }
     func text(_ url: URL, headers: [String: String]) async throws -> String { html }
+}
+
+private actor DouyinSearchClient: HTTPRequesting {
+    struct Request: Sendable { let url: URL; let cookie: String }
+    var requests: [Request] = []
+    var refreshedSession = ""
+    func get(_ url: URL, headers: [String: String]) async throws -> JSONValue {
+        let cookie = headers["Cookie"] ?? ""
+        requests.append(Request(url: url, cookie: cookie))
+        let source: String
+        if cookie.contains("sessionid=test-account") {
+            refreshedSession = "sessionid=test-account; "
+            source = #"{"status_code":0,"cursor":23,"log_pb":{"impr_id":"server-search-id"},"has_more":1,"data":[{"lives":{"rawdata":"{\"owner\":{\"web_rid\":\"123\",\"nickname\":\"主播\"},\"title\":\"游戏直播\",\"status\":2}"}}]}"#
+        } else { source = #"{"status_code":2483,"status_msg":"请先登录，再继续搜索吧"}"# }
+        return try JSONDecoder().decode(JSONValue.self, from: Data(source.utf8))
+    }
+    func text(_ url: URL, headers: [String: String]) async throws -> String { "<html></html>" }
+    func cookies(for url: URL) async -> String { refreshedSession + "ttwid=guest; nonce=guest" }
+    func clearCookies(for url: URL) async { refreshedSession = "" }
 }

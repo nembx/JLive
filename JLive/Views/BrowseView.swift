@@ -6,7 +6,13 @@ struct BrowseView: View {
     let isSearch: Bool
     @State private var model: BrowseModel
     @State private var showingAddRoom = false
+    @State private var showingSearch = false
+    @State private var showingDouyinLogin = false
+    @State private var searchText = ""
     @State private var directRoom: LiveRoom?
+    @FocusState private var searchFocused: Bool
+    @Environment(\.dismiss) private var dismiss
+    @Environment(DouyinAccountStore.self) private var douyinAccount
 
     init(service: LiveService, isSearch: Bool) {
         self.service = service
@@ -15,70 +21,125 @@ struct BrowseView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    header.padding(.horizontal, 20)
-                    if isSearch { searchField.padding(.horizontal, 20) }
-                    PlatformPicker(selection: $model.selectedPlatform)
-                    content.padding(.horizontal, 20)
+        Group {
+            if isSearch { page }
+            else {
+                NavigationStack {
+                    page.navigationDestination(isPresented: $showingSearch) { BrowseView(service: service, isSearch: true) }
                 }
-                .padding(.top, 12).padding(.bottom, 24)
             }
-            .background(JLiveTheme.background)
-            .toolbar(.hidden, for: .navigationBar)
-            .refreshable { await model.load(isSearch: isSearch) }
-            .task(id: model.requestKey) { await model.load(isSearch: isSearch) }
-            .sheet(isPresented: $showingAddRoom) {
-                AddRoomSheet { room in directRoom = room }
-                    .presentationDetents([.medium])
-            }
-            .navigationDestination(item: $directRoom) { room in RoomDetailView(room: room, service: service) }
         }
+    }
+
+    private var page: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: JLiveLayout.sectionSpacing) {
+                if isSearch { searchField.padding(.horizontal, JLiveLayout.pageInset) }
+                else { header.padding(.horizontal, JLiveLayout.pageInset) }
+                PlatformPicker(selection: $model.selectedPlatform)
+                content.padding(.horizontal, JLiveLayout.pageInset)
+            }
+            .padding(.top, 12).padding(.bottom, 24)
+        }
+        .background(JLiveTheme.background)
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar(isSearch ? .visible : .hidden, for: .navigationBar)
+        .toolbar(isSearch ? .hidden : .visible, for: .tabBar)
+        .navigationTitle(isSearch ? "搜索" : "")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(isSearch)
+        .toolbar {
+            if isSearch {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { searchFocused = false; dismiss() }
+                        .accessibilityIdentifier("cancelSearch")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { searchFocused = false; showingAddRoom = true } label: { Image(systemName: "link") }
+                        .accessibilityLabel("打开直播间链接")
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("收起键盘") { searchFocused = false }
+                }
+            }
+        }
+        .refreshable { await model.load(isSearch: isSearch) }
+        .task(id: model.requestKey) { await model.load(isSearch: isSearch) }
+        .task {
+            if isSearch {
+                try? await Task.sleep(for: .milliseconds(200))
+                if !Task.isCancelled { searchFocused = true }
+            }
+        }
+        .onDisappear { searchFocused = false }
+        .onChange(of: douyinAccount.revision) {
+            if isSearch && !model.keyword.isEmpty { Task { await model.load(isSearch: true) } }
+        }
+        .sheet(isPresented: $showingDouyinLogin) { DouyinLoginView() }
+        .sheet(isPresented: $showingAddRoom) {
+            AddRoomSheet { room in directRoom = room }
+                .presentationDetents([.medium])
+        }
+        .navigationDestination(item: $directRoom) { room in RoomDetailView(room: room, service: service) }
     }
 
     private var header: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 7) {
-                    if !isSearch { Image("BrandMark").resizable().frame(width: 42, height: 42).clipShape(RoundedRectangle(cornerRadius: 12)) }
-                    Text(isSearch ? "找到你的热爱" : "JLive").font(.system(size: isSearch ? 27 : 34, weight: .heavy, design: .rounded))
-                    if !isSearch {
-                        Text("LIVE").font(.system(size: 9, weight: .heavy, design: .monospaced))
-                            .tracking(1.5).padding(.horizontal, 7).padding(.vertical, 4)
-                            .foregroundStyle(.black).background(JLiveTheme.lime, in: Capsule())
-                    }
+                    Image("BrandMark").resizable().frame(width: 42, height: 42).clipShape(RoundedRectangle(cornerRadius: 12))
+                    Text("JLive").font(.system(size: 34, weight: .heavy, design: .rounded))
+                    Text("LIVE").font(.system(size: 9, weight: .heavy, design: .monospaced))
+                        .tracking(1.5).padding(.horizontal, 7).padding(.vertical, 4)
+                        .foregroundStyle(.black).background(JLiveTheme.lime, in: Capsule())
                 }
-                Text(isSearch ? "搜主播、直播间，或直接打开链接" : "喜欢的直播，都在这里")
+                Text("喜欢的直播，都在这里")
                     .font(.system(size: 12)).foregroundStyle(.secondary)
             }
             Spacer()
-            Button { showingAddRoom = true } label: {
-                Image(systemName: "link").font(.system(size: 17, weight: .medium))
-                    .frame(width: 42, height: 42).background(JLiveTheme.surface, in: Circle())
+            HStack(spacing: JLiveLayout.itemSpacing) {
+                CircleIconButton(symbol: "magnifyingglass", label: "搜索直播") { showingSearch = true }
+                CircleIconButton(symbol: "link", label: "打开直播间链接") { showingAddRoom = true }
             }
-            .accessibilityLabel("打开直播间链接")
         }
     }
 
     private var searchField: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: JLiveLayout.itemSpacing) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("搜索主播或直播间", text: $model.keyword)
+            TextField("搜索主播或直播间", text: $searchText)
                 .font(.subheadline).submitLabel(.search).autocorrectionDisabled()
-            if !model.keyword.isEmpty {
-                Button { model.keyword = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                .textInputAutocapitalization(.never)
+                .focused($searchFocused)
+                .accessibilityIdentifier("searchField")
+                .onSubmit { submitSearch() }
+            if !searchText.isEmpty {
+                Button { searchText = ""; model.keyword = ""; searchFocused = true } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).frame(width: 32, height: 44)
+                }
                     .accessibilityLabel("清空搜索")
             }
+            Button("搜索", action: submitSearch)
+                .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
+                .disabled(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("submitSearch")
         }
-        .padding(15).background(JLiveTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, JLiveLayout.cardInset).padding(.vertical, 4)
+        .background(JLiveTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func submitSearch() {
+        searchFocused = false
+        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if model.keyword == keyword { Task { await model.load(isSearch: true) } }
+        else { model.keyword = keyword }
     }
 
     @ViewBuilder private var content: some View {
-        if isSearch && model.selectedPlatform?.supportsSearch == false {
-            EmptyState(symbol: "link", title: "通过链接打开抖音直播", message: "抖音暂不支持关键词搜索\n点右上角粘贴直播间链接或输入房间号")
-        } else if isSearch && model.keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            EmptyState(symbol: "magnifyingglass", title: "下一场精彩，从搜索开始", message: "同时搜索 B站、虎牙和斗鱼\n也可以选择一个平台精准查找")
+        if isSearch && model.keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            EmptyState(symbol: "magnifyingglass", title: "找到你喜欢的直播", message: "搜索 B站、虎牙、斗鱼和抖音\n输入关键词后点击搜索")
+                .contentShape(Rectangle()).onTapGesture { searchFocused = false }
         } else {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
@@ -90,6 +151,15 @@ struct BrowseView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(model.issues) { issue in
                             Text("\(issue.platform.name)：\(issue.message)").font(.caption).foregroundStyle(.secondary)
+                            if issue.platform == .douyin && issue.requiresLogin {
+                                Button(douyinAccount.isLoggedIn ? "重新登录抖音" : "登录抖音") {
+                                    searchFocused = false
+                                    showingDouyinLogin = true
+                                }.font(.subheadline.weight(.semibold)).accessibilityIdentifier("douyinSearchLogin")
+                            }
+                            if isSearch && issue.platform == .douyin, let url = douyinWebSearchURL {
+                                Link("在抖音官网搜索", destination: url).font(.caption)
+                            }
                         }
                         Button("重新加载") { Task { await model.load(isSearch: isSearch) } }.font(.caption.bold())
                     }
@@ -118,6 +188,13 @@ struct BrowseView: View {
                 }
             }
         }
+    }
+
+    private var douyinWebSearchURL: URL? {
+        let base = URL(string: "https://www.douyin.com/search/")!
+        var url = URLComponents(url: base.appendingPathComponent(model.keyword), resolvingAgainstBaseURL: false)
+        url?.queryItems = [URLQueryItem(name: "type", value: "live")]
+        return url?.url
     }
 }
 
@@ -151,7 +228,11 @@ struct AddRoomSheet: View {
                 }
             }
             .navigationTitle("打开直播间").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }.accessibilityIdentifier("cancelRoomLink")
+                }
+            }
         }
     }
 }

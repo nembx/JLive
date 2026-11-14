@@ -29,17 +29,65 @@ final class PlayerUITests: XCTestCase {
         XCTAssertFalse(app.buttons["全屏播放"].exists)
     }
 
-    func testDouyinSearchOffersDirectRoomOpening() {
+    func testSearchCanDismissKeyboardSubmitAndCancel() {
         let app = XCUIApplication()
-        app.launchArguments = ["--muted"]
+        app.launchArguments = ["--muted", "--ui-fixtures"]
         app.launch()
         defer { app.terminate() }
-        app.tabBars.buttons["搜索"].tap()
+        XCTAssertFalse(app.tabBars.buttons["搜索"].exists)
+        app.buttons["搜索直播"].tap()
+        let field = app.textFields["searchField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 4))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 4))
+        app.buttons["收起键盘"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 4))
+        field.tap()
+        field.typeText("游戏")
+        app.buttons["submitSearch"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["搜索结果"].waitForExistence(timeout: 4))
+        let login = app.buttons["douyinSearchLogin"]
+        XCTAssertTrue(login.waitForExistence(timeout: 4))
+        login.tap()
+        XCTAssertTrue(app.navigationBars["登录抖音"].waitForExistence(timeout: 4))
+        app.buttons["cancelDouyinLogin"].tap()
+        field.tap()
+        app.buttons["cancelSearch"].tap()
+        XCTAssertTrue(app.buttons["搜索直播"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 4))
+        app.buttons["搜索直播"].tap()
+        app.buttons["收起键盘"].tap()
         app.buttons["抖音"].tap()
-        XCTAssertTrue(app.staticTexts["通过链接打开抖音直播"].waitForExistence(timeout: 4))
         app.buttons["打开直播间链接"].tap()
         XCTAssertTrue(app.buttons["打开直播间"].waitForExistence(timeout: 4))
-        app.buttons["取消"].tap()
+        app.buttons["cancelRoomLink"].tap()
+        app.buttons["cancelSearch"].tap()
+    }
+
+    func testFavoriteStatusFiltersAndHistoryInMyPage() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--muted", "--ui-fixtures"]
+        app.launch()
+        defer { app.terminate() }
+        app.tabBars.buttons["收藏"].tap()
+        XCTAssertTrue(app.segmentedControls["favoriteStatusPicker"].waitForExistence(timeout: 4))
+        XCTAssertFalse(app.buttons["最近观看"].exists)
+        app.buttons["正在开播 · 1"].tap()
+        XCTAssertTrue(app.buttons["room-bilibili:1"].exists)
+        XCTAssertFalse(app.buttons["room-bilibili:3"].exists)
+        app.buttons["未开播 · 1"].tap()
+        XCTAssertTrue(app.buttons["room-bilibili:2"].exists)
+        XCTAssertFalse(app.buttons["room-bilibili:1"].exists)
+        app.buttons["全部 · 3"].tap()
+        XCTAssertTrue(app.buttons["room-bilibili:3"].exists)
+        let cards = XCTAttachment(screenshot: app.screenshot())
+        cards.name = "收藏卡片与开播筛选"; cards.lifetime = .keepAlways; add(cards)
+        app.tabBars.buttons["我的"].tap()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "最近观看")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["最近打开的 2 个直播间，按时间排列"].waitForExistence(timeout: 4))
+        app.buttons["清空"].tap()
+        app.buttons["清空记录"].tap()
+        XCTAssertTrue(app.staticTexts["还没有观看记录"].waitForExistence(timeout: 4))
     }
 
     func testFullscreenKeepsSettingsAndReturnsToInlinePlayer() throws {
@@ -87,15 +135,17 @@ final class PlayerUITests: XCTestCase {
 
     func testAppearanceAndLibraryBackupActions() {
         let app = XCUIApplication()
-        app.launchArguments = ["--muted"]
+        app.launchArguments = ["--muted", "--ui-fixtures"]
         app.launch()
         defer { app.terminate() }
         app.tabBars.buttons["我的"].tap()
-        XCTAssertTrue(app.staticTexts["收藏备份"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["appearancePicker"].waitForExistence(timeout: 5))
         app.swipeUp()
+        if !app.buttons["导入收藏"].isHittable { app.swipeUp() }
         XCTAssertTrue(app.buttons["导出收藏"].exists)
         XCTAssertTrue(app.buttons["导入收藏"].exists)
         app.swipeDown()
+        if !app.buttons["appearancePicker"].isHittable { app.swipeDown() }
         app.buttons["appearancePicker"].tap()
         app.buttons["深色"].tap()
         let dark = XCTAttachment(screenshot: app.screenshot())

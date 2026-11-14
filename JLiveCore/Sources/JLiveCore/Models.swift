@@ -27,7 +27,7 @@ public enum LivePlatform: String, CaseIterable, Codable, Identifiable, Sendable 
         }
     }
     public var supportsDiscovery: Bool { true }
-    public var supportsSearch: Bool { self != .douyin }
+    public var supportsSearch: Bool { true }
     public var supportsNativePlayback: Bool { true }
     public var supportsChat: Bool { true }
 
@@ -111,6 +111,7 @@ public enum LiveError: LocalizedError, Sendable {
     case invalidResponse
     case http(Int)
     case platform(String)
+    case loginRequired(LivePlatform)
     case offline
     case noPlayableStream
     case unsupported
@@ -121,6 +122,7 @@ public enum LiveError: LocalizedError, Sendable {
         case .invalidResponse: "平台返回的数据格式发生变化，请稍后重试。"
         case .http(let status): "网络请求失败（\(status)），请稍后重试。"
         case .platform(let message): "平台暂时无法访问：\(message)"
+        case .loginRequired(let platform): "请先登录\(platform.name)，再继续搜索。"
         case .offline: "主播还未开播，收藏后下次再来看看。"
         case .noPlayableStream: "暂时没有可播放的线路，可以前往平台观看。"
         case .unsupported: "这个功能暂未接入，可以前往平台官网使用。"

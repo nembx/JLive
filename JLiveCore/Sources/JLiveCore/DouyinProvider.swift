@@ -8,7 +8,17 @@ public actor DouyinProvider: LiveProvider {
     private let client: any HTTPRequesting
     private var bootstrapped = false
     private var cachedRooms: [String: (room: JSONValue, at: Date)] = [:]
-    static let userAgent = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.97 Safari/537.36 Core/1.116.567.400 QQBrowser/19.7.6764.400"
+    private var searchSessions: [String: SearchSession] = [:]
+    private var searchBootstrapped = false
+    private var credentials: DouyinCredentials?
+    private var credentialRevision = UUID()
+    private struct SearchSession {
+        let page: Int
+        let cursor: String
+        let searchID: String
+        let at: Date
+    }
+    static let userAgent = DouyinCredentials.userAgent
 
     public init(client: any HTTPRequesting) { self.client = client }
 
@@ -61,9 +71,114 @@ public actor DouyinProvider: LiveProvider {
         return RoomPage(rooms: rooms, hasMore: list.count >= 15)
     }
 
+    public func setCredentials(_ credentials: DouyinCredentials?) async {
+        self.credentials = credentials
+        credentialRevision = UUID()
+        searchSessions.removeAll()
+        if credentials == nil {
+            // Search responses may refresh account cookies in URLSession as well as WebKit.
+            await client.clearCookies(for: URL(string: "https://www.douyin.com/")!)
+            await client.clearCookies(for: LivePlatform.douyin.homeURL)
+            searchBootstrapped = false
+            bootstrapped = false
+        }
+    }
+
+    /// Validate with the live search endpoint without replacing an existing account on failure.
+    public func validateCredentials(_ credentials: DouyinCredentials) async throws {
+        _ = try Self.parseSearch(await searchResponse(keyword: "游戏", offset: "0", searchID: "", credentials: credentials))
+    }
+
     public func search(keyword: String, page: Int) async throws -> RoomPage {
-        // Live-site search requires authenticated webapp search; use links/IDs through the direct-open flow.
-        throw LiveError.platform("抖音暂不支持应用内关键词搜索，可粘贴直播间链接或房间号打开。")
+        let keyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !keyword.isEmpty else { return RoomPage(rooms: [], hasMore: false) }
+        let page = max(1, page)
+        let revision = credentialRevision
+        searchSessions = searchSessions.filter { Date().timeIntervalSince($0.value.at) < 300 }
+        let previous = searchSessions[keyword].flatMap { $0.page == page - 1 ? $0 : nil }
+        let response = try await searchResponse(keyword: keyword, offset: previous?.cursor ?? String((page - 1) * 10),
+            searchID: previous?.searchID ?? "", credentials: credentials)
+        guard revision == credentialRevision else { throw CancellationError() }
+        let result = try Self.parseSearch(response)
+        if searchSessions.count >= 20 { searchSessions.removeAll() }
+        searchSessions[keyword] = SearchSession(page: page, cursor: response["cursor"].string.isEmpty ? String(page * 10) : response["cursor"].string,
+            searchID: response["log_pb"]["impr_id"].string, at: Date())
+        return result
+    }
+
+    private func searchResponse(keyword: String, offset: String, searchID: String, credentials: DouyinCredentials?) async throws -> JSONValue {
+        let home = URL(string: "https://www.douyin.com/")!
+        _ = try await headers()
+        if !searchBootstrapped {
+            _ = try await client.text(home, headers: ["User-Agent": Self.userAgent])
+            searchBootstrapped = true
+        }
+        let url = try Self.searchURL(keyword: keyword, offset: offset, searchID: searchID)
+        var referer = URLComponents(url: home.appendingPathComponent("search").appendingPathComponent(keyword), resolvingAgainstBaseURL: false)!
+        referer.queryItems = [URLQueryItem(name: "type", value: "live")]
+        let guestCookies = await client.cookies(for: home)
+        let cookie = Self.searchCookies(guest: guestCookies, account: credentials?.cookie ?? "")
+        let headers = ["User-Agent": Self.userAgent, "Referer": referer.url!.absoluteString,
+            "Cookie": cookie, "Accept": "application/json, text/plain, */*", "Accept-Language": "zh-CN,zh;q=0.9",
+            "Sec-Fetch-Dest": "empty", "Sec-Fetch-Mode": "cors", "Sec-Fetch-Site": "same-origin"]
+        do {
+            return try await client.get(url, headers: headers)
+        } catch LiveError.invalidResponse {
+            try Task.checkCancellation()
+            return try await client.get(DouyinSigner.signedURL(url), headers: headers)
+        }
+    }
+
+    static func searchCookies(guest: String, account: String) -> String {
+        var seen = Set<String>()
+        return (account + ";" + guest).split(separator: ";").compactMap { field -> String? in
+            let field = field.trimmingCharacters(in: .whitespaces)
+            guard let separator = field.firstIndex(of: "="), separator != field.startIndex else { return nil }
+            let name = String(field[..<separator])
+            return seen.insert(name).inserted ? field : nil
+        }.joined(separator: "; ")
+    }
+
+    static func searchURL(keyword: String, offset: String, searchID: String = "") throws -> URL {
+        var query = ["device_platform": "webapp", "aid": "6383", "channel": "channel_pc_web", "search_channel": "aweme_live",
+            "keyword": keyword, "search_source": "switch_tab", "query_correct_type": "1", "is_filter_search": "0", "from_group_id": "",
+            "offset": offset, "count": "10", "pc_client_type": "1", "version_code": "170400", "version_name": "17.4.0",
+            "cookie_enabled": "true", "screen_width": "1920", "screen_height": "1080", "browser_language": "zh-CN",
+            "browser_platform": "Win32", "browser_name": "Chrome", "browser_version": "116.0.0.0", "browser_online": "true",
+            "engine_name": "Blink", "engine_version": "116.0.0.0", "os_name": "Windows", "os_version": "10",
+            "cpu_core_num": "12", "device_memory": "8", "platform": "PC", "downlink": "10", "effective_type": "4g", "round_trip_time": "100"]
+        if !searchID.isEmpty { query["search_id"] = searchID }
+        return try endpoint("https://www.douyin.com/aweme/v1/web/live/search/", query)
+    }
+
+    static func parseSearch(_ response: JSONValue) throws -> RoomPage {
+        guard !response["status_code"].isNull else { throw LiveError.invalidResponse }
+        if response["status_code"].int == 2483 { throw LiveError.loginRequired(.douyin) }
+        guard response["status_code"].int == 0 else {
+            let message = response["status_msg"].string
+            throw LiveError.platform(message.isEmpty ? "抖音直播搜索暂时受限，请稍后重试。" : message)
+        }
+        let items = try response["data"].requiredArray()
+        var seen = Set<String>()
+        var decodedCount = 0
+        let rooms = items.compactMap { item -> LiveRoom? in
+            let raw = item["lives"]["rawdata"].string
+            guard let data = try? JSONDecoder().decode(JSONValue.self, from: Data(raw.utf8)) else { return nil }
+            decodedCount += 1
+            let webID = data["owner"]["web_rid"].string
+            let id = webID.isEmpty ? data["id_str"].string : webID
+            guard !id.isEmpty, id.allSatisfy({ $0.isASCII && $0.isNumber }), seen.insert(id).inserted else { return nil }
+            var room = Self.room(data, webID: id)
+            if room.isLive == nil { room.isLive = true }
+            if room.viewerCount == 0 { room.viewerCount = data["stats"]["total_user"].int }
+            return room
+        }
+        guard items.isEmpty || decodedCount > 0 else { throw LiveError.invalidResponse }
+        let hasMore: Bool
+        if case .bool(let value) = response["has_more"] { hasMore = value }
+        else if !response["has_more"].isNull { hasMore = response["has_more"].int != 0 }
+        else { hasMore = items.count >= 10 }
+        return RoomPage(rooms: rooms, hasMore: hasMore)
     }
 
     private func roomData(_ id: String, allowCache: Bool) async throws -> JSONValue {
@@ -301,4 +416,10 @@ func balancedObject(after marker: String, in text: String) -> String? {
         }
     }
     return nil
+}
+
+public struct DouyinCredentials: Codable, Sendable {
+    public let cookie: String
+    public init(cookie: String) { self.cookie = cookie }
+    public static let userAgent = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.97 Safari/537.36 Core/1.116.567.400 QQBrowser/19.7.6764.400"
 }

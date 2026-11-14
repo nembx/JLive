@@ -1,6 +1,29 @@
 import SwiftUI
 import JLiveCore
 
+enum JLiveLayout {
+    static let pageInset: CGFloat = 20
+    static let sectionSpacing: CGFloat = 24
+    static let cardInset: CGFloat = 12
+    static let itemSpacing: CGFloat = 12
+    static let gridSpacing: CGFloat = 12
+}
+
+struct CircleIconButton: View {
+    let symbol: String
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 17, weight: .medium))
+                .frame(width: 44, height: 44).background(JLiveTheme.surface, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain).accessibilityLabel(label)
+    }
+}
+
 enum JLiveTheme {
     static let accent = Color(light: UIColor(red: 0.18, green: 0.42, blue: 0.08, alpha: 1), dark: UIColor(red: 0.72, green: 0.94, blue: 0.33, alpha: 1))
     static let background = Color(uiColor: .systemGroupedBackground)
@@ -42,7 +65,7 @@ struct PlatformPicker: View {
                 chip("全部", platform: nil)
                 ForEach(LivePlatform.allCases) { platform in chip(platform.name, platform: platform) }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, JLiveLayout.pageInset)
         }
     }
 
@@ -78,36 +101,36 @@ struct RoomCard: View {
                             .frame(width: geometry.size.width, height: geometry.size.height).clipped()
                         }
                     }
-                PlatformBadge(platform: room.platform).padding(8)
+                PlatformBadge(platform: room.platform).padding(JLiveLayout.cardInset)
                 VStack {
                     Spacer()
-                    HStack(spacing: 4) {
-                        if room.isLive != false {
-                            Image(systemName: "flame.fill").font(.system(size: 9))
+                    HStack(alignment: .center, spacing: 4) {
+                        if room.isLive == true {
+                            Image(systemName: "flame.fill").font(.system(size: 9)).frame(width: 12, height: 12)
                             Text(room.popularity).font(.system(size: 10, weight: .medium))
-                        } else { Text("未开播").font(.system(size: 10)) }
+                        } else { Text(room.isLive == false ? "未开播" : "状态待更新").font(.system(size: 10)) }
                         Spacer()
-                        Image(systemName: "play.fill").font(.system(size: 10))
+                        Image(systemName: "play.fill").font(.system(size: 10)).frame(width: 12, height: 12)
                     }
-                    .foregroundStyle(.white).padding(8)
+                    .foregroundStyle(.white).padding(JLiveLayout.cardInset)
                     .background(LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom))
                 }
             }
-            .frame(height: 110)
+            .aspectRatio(16 / 9, contentMode: .fit)
             .clipped()
 
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: JLiveLayout.itemSpacing) {
                 Text(room.title.isEmpty ? "\(room.streamer)的直播间" : room.title)
-                    .font(.system(size: 13, weight: .semibold)).lineLimit(2)
-                    .frame(height: 36, alignment: .topLeading)
-                HStack(spacing: 4) {
-                    Image(systemName: "person.circle").font(.system(size: 11))
-                    Text(room.streamer).font(.system(size: 11)).lineLimit(1)
-                    Spacer(minLength: 0)
+                    .font(.subheadline.weight(.semibold)).lineLimit(2, reservesSpace: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(alignment: .center, spacing: 6) {
+                    Image(systemName: "person.circle").font(.caption).frame(width: 14, height: 14)
+                    Text(room.streamer).font(.caption).lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .foregroundStyle(.secondary)
             }
-            .padding(10)
+            .padding(JLiveLayout.cardInset)
         }
         .background(JLiveTheme.surface, in: RoundedRectangle(cornerRadius: 13))
         .clipShape(RoundedRectangle(cornerRadius: 13))
@@ -122,10 +145,11 @@ struct RoomGrid: View {
     @Environment(LibraryStore.self) private var library
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 14) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: JLiveLayout.gridSpacing, alignment: .top)], alignment: .leading, spacing: JLiveLayout.gridSpacing) {
             ForEach(rooms) { room in
                 NavigationLink(value: room) { RoomCard(room: room) }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("room-\(room.id)")
                     .contextMenu {
                         Button { library.toggle(room) } label: {
                             Label(library.contains(room) ? "取消收藏" : "收藏直播间", systemImage: library.contains(room) ? "heart.slash" : "heart")
@@ -143,7 +167,7 @@ struct EmptyState: View {
     let title: String
     let message: String
     var body: some View {
-        VStack(spacing: 15) {
+        VStack(spacing: JLiveLayout.itemSpacing) {
             Image(systemName: symbol).font(.system(size: 36, weight: .light)).foregroundStyle(JLiveTheme.accent)
                 .frame(width: 82, height: 82).background(JLiveTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 24))
             Text(title).font(.headline)

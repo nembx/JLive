@@ -18,6 +18,7 @@ public extension LiveProvider {
 public struct PlatformIssue: Identifiable, Sendable {
     public let platform: LivePlatform
     public let message: String
+    public let requiresLogin: Bool
     public var id: String { platform.id }
 }
 
@@ -49,9 +50,12 @@ public struct LiveService: Sendable {
                         let result = try await keyword.isEmpty
                             ? provider.recommendations(page: page)
                             : provider.search(keyword: keyword, page: page)
-                        return ProviderResult(platform: platform, page: result, error: nil)
+                        return ProviderResult(platform: platform, page: result, error: nil, requiresLogin: false)
                     } catch {
-                        return ProviderResult(platform: platform, page: nil, error: error.localizedDescription)
+                        let requiresLogin: Bool
+                        if case LiveError.loginRequired = error { requiresLogin = true }
+                        else { requiresLogin = false }
+                        return ProviderResult(platform: platform, page: nil, error: error.localizedDescription, requiresLogin: requiresLogin)
                     }
                 }
             }
@@ -78,7 +82,7 @@ public struct LiveService: Sendable {
             rooms: rooms,
             platformsWithMore: Set(results.filter { $0.page?.hasMore == true }.map(\.platform)),
             issues: sorted.compactMap { result in
-                result.error.map { PlatformIssue(platform: result.platform, message: $0) }
+                result.error.map { PlatformIssue(platform: result.platform, message: $0, requiresLogin: result.requiresLogin) }
             }
         )
     }
@@ -102,6 +106,15 @@ public struct LiveService: Sendable {
         await (providers[.bilibili] as? BilibiliProvider)?.setCredentials(credentials)
     }
 
+    public func setDouyinCredentials(_ credentials: DouyinCredentials?) async {
+        await (providers[.douyin] as? DouyinProvider)?.setCredentials(credentials)
+    }
+
+    public func validateDouyinCredentials(_ credentials: DouyinCredentials) async throws {
+        guard let provider = providers[.douyin] as? DouyinProvider else { throw LiveError.unsupported }
+        try await provider.validateCredentials(credentials)
+    }
+
     public func sendChat(_ text: String, room: LiveRoom) async throws {
         guard room.platform == .bilibili, let provider = providers[.bilibili] as? BilibiliProvider else { throw LiveError.unsupported }
         try await provider.sendChat(roomID: room.roomID, text: text)
@@ -111,5 +124,6 @@ public struct LiveService: Sendable {
         let platform: LivePlatform
         let page: RoomPage?
         let error: String?
+        let requiresLogin: Bool
     }
 }

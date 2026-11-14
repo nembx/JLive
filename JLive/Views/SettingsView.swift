@@ -2,14 +2,16 @@ import SwiftUI
 import JLiveCore
 
 struct SettingsView: View {
+    let service: LiveService
     @Environment(LibraryStore.self) private var library
     @Environment(AccountStore.self) private var account
-    @State private var confirmingClear = false
+    @Environment(DouyinAccountStore.self) private var douyinAccount
     @State private var exporting = false
     @State private var importing = false
     @State private var backup: LibraryBackupDocument?
     @State private var message: String?
     @State private var showingLogin = false
+    @State private var showingDouyinLogin = false
 
     /// Taken from the bundle so the number follows `MARKETING_VERSION` in project.yml.
     private static var version: String {
@@ -21,22 +23,32 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    HStack(spacing: 17) {
+                    HStack(spacing: JLiveLayout.itemSpacing) {
                         Image("BrandMark").resizable().frame(width: 62, height: 62)
                             .clipShape(RoundedRectangle(cornerRadius: 17))
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 8) {
                             Text("JLive").font(.title2.bold())
-                            Text("简简单单，看你喜欢的直播。 ").font(.caption).foregroundStyle(.secondary)
+                            Text("简简单单，看你喜欢的直播。").font(.caption).foregroundStyle(.secondary)
                             Text(verbatim: "v" + Self.version).font(.caption2.monospaced()).foregroundStyle(.secondary)
                         }
                     }.padding(.vertical, 10)
+                }
+                Section("观看记录") {
+                    NavigationLink {
+                        HistoryView(service: service)
+                    } label: {
+                        HStack(spacing: JLiveLayout.itemSpacing) {
+                            Label("最近观看", systemImage: "clock")
+                            Spacer()
+                            Text("\(library.history.count)").font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 Section("偏好设置") {
                     Picker("外观", selection: $library.appearance) {
                         ForEach(AppAppearance.allCases) { Text($0.name).tag($0) }
                     }
                     .accessibilityIdentifier("appearancePicker")
-                    Button("清空观看记录", role: .destructive) { confirmingClear = true }
                 }
                 Section("B站账号") {
                     if account.isLoggedIn {
@@ -55,6 +67,17 @@ struct SettingsView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
+                }
+                Section("抖音账号") {
+                    if douyinAccount.isLoggedIn {
+                        Label("已保存搜索会话", systemImage: "person.crop.circle.badge.checkmark")
+                        Button("退出抖音登录", role: .destructive) { Task { await douyinAccount.logout() } }
+                            .disabled(douyinAccount.isChecking)
+                    } else {
+                        Button("登录抖音") { showingDouyinLogin = true }
+                    }
+                    Text("关键词搜索需要登录。登录失效时可在搜索页重新登录；推荐和打开直播间无需登录。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Section("收藏备份") {
                     Button("导出收藏") {
@@ -78,6 +101,7 @@ struct SettingsView: View {
             }
             .navigationTitle("我的")
             .sheet(isPresented: $showingLogin) { BilibiliLoginView() }
+            .sheet(isPresented: $showingDouyinLogin) { DouyinLoginView() }
             .fileExporter(isPresented: $exporting, document: backup, contentType: .json, defaultFilename: "JLive-收藏") { result in
                 if case .failure(let error) = result { message = error.localizedDescription }
             }
@@ -96,9 +120,6 @@ struct SettingsView: View {
             .alert("收藏备份", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 Button("知道了") { message = nil }
             } message: { Text(message ?? "") }
-            .confirmationDialog("清空所有观看记录？", isPresented: $confirmingClear, titleVisibility: .visible) {
-                Button("清空记录", role: .destructive) { library.clearHistory() }
-            }
         }
     }
 }

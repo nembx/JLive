@@ -21,6 +21,18 @@ enum AppAppearance: String, CaseIterable, Identifiable {
     }
 }
 
+enum FavoriteFilter: String, CaseIterable, Identifiable {
+    case all, live, offline
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .all: "全部"
+        case .live: "正在开播"
+        case .offline: "未开播"
+        }
+    }
+}
+
 @MainActor @Observable
 final class LibraryStore {
     private(set) var favorites: [LiveRoom] = []
@@ -41,6 +53,14 @@ final class LibraryStore {
     }
 
     func contains(_ room: LiveRoom) -> Bool { favorites.contains { $0.id == room.id } }
+
+    func favorites(matching filter: FavoriteFilter) -> [LiveRoom] {
+        switch filter {
+        case .all: favorites
+        case .live: favorites.filter { $0.isLive == true }
+        case .offline: favorites.filter { $0.isLive == false }
+        }
+    }
 
     func toggle(_ room: LiveRoom) {
         if contains(room) { favorites.removeAll { $0.id == room.id } }

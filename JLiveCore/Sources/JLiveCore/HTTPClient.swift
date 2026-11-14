@@ -49,12 +49,14 @@ public protocol HTTPRequesting: Sendable {
     func text(_ url: URL, headers: [String: String]) async throws -> String
     func post(_ url: URL, body: String, headers: [String: String]) async throws -> JSONValue
     func cookies(for url: URL) async -> String
+    func clearCookies(for url: URL) async
 }
 
 public extension HTTPRequesting {
     func text(_ url: URL, headers: [String: String]) async throws -> String { throw LiveError.unsupported }
     func post(_ url: URL, body: String, headers: [String: String]) async throws -> JSONValue { throw LiveError.unsupported }
     func cookies(for url: URL) async -> String { "" }
+    func clearCookies(for url: URL) async {}
 }
 
 public actor HTTPClient: HTTPRequesting {
@@ -89,6 +91,11 @@ public actor HTTPClient: HTTPRequesting {
 
     public func cookies(for url: URL) async -> String {
         (session.configuration.httpCookieStorage?.cookies(for: url) ?? []).map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
+    }
+
+    public func clearCookies(for url: URL) async {
+        guard let storage = session.configuration.httpCookieStorage else { return }
+        for cookie in storage.cookies(for: url) ?? [] { storage.deleteCookie(cookie) }
     }
 
     private func data(_ original: URLRequest, headers: [String: String]) async throws -> Data {

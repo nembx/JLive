@@ -6,10 +6,20 @@ struct JLiveApp: App {
     @State private var library = LibraryStore()
     @State private var externalRoom: LiveRoom?
     @State private var account: AccountStore
-    private let service = LiveService.standard()
+    @State private var douyinAccount: DouyinAccountStore
+    private let service: LiveService
 
     init() {
+        #if DEBUG
+        let useFixtures = CommandLine.arguments.contains("--ui-fixtures")
+        let service = useFixtures ? UIFixtures.service : LiveService.standard()
+        if useFixtures { _library = State(initialValue: UIFixtures.library()) }
+        #else
+        let service = LiveService.standard()
+        #endif
+        self.service = service
         _account = State(initialValue: AccountStore(service: service))
+        _douyinAccount = State(initialValue: DouyinAccountStore(service: service))
         #if DEBUG
         if let index = CommandLine.arguments.firstIndex(of: "--open-room"),
            CommandLine.arguments.indices.contains(index + 1),
@@ -24,16 +34,15 @@ struct JLiveApp: App {
             TabView {
                 BrowseView(service: service, isSearch: false)
                     .tabItem { Label("发现", systemImage: "play.rectangle.on.rectangle") }
-                BrowseView(service: service, isSearch: true)
-                    .tabItem { Label("搜索", systemImage: "magnifyingglass") }
                 LibraryView(service: service)
                     .tabItem { Label("收藏", systemImage: "heart") }
-                SettingsView()
+                SettingsView(service: service)
                     .tabItem { Label("我的", systemImage: "person.crop.circle") }
             }
             .tint(JLiveTheme.accent)
             .environment(library)
             .environment(account)
+            .environment(douyinAccount)
             .preferredColorScheme(library.appearance.colorScheme)
             .onOpenURL { url in
                 guard url.scheme == "jlive", let platform = LivePlatform(rawValue: url.host ?? ""),
@@ -48,6 +57,7 @@ struct JLiveApp: App {
                 }
                 .environment(library)
                 .environment(account)
+                .environment(douyinAccount)
                 .preferredColorScheme(library.appearance.colorScheme)
                 .tint(JLiveTheme.accent)
             }

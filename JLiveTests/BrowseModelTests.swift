@@ -17,19 +17,19 @@ final class BrowseModelTests: XCTestCase {
         XCTAssertTrue(model.issues.isEmpty)
     }
 
-    func testCombinedSearchSkipsPlatformsWithoutKeywordSearch() async {
+    func testCombinedSearchIncludesDouyin() async {
         let bili = BrowseProvider(platform: .bilibili)
         let douyin = BrowseProvider(platform: .douyin)
         let model = BrowseModel(service: LiveService(providers: [bili, douyin]))
         model.keyword = "主播"
         await model.load(isSearch: true)
-        XCTAssertEqual(model.rooms.map(\.platform), [.bilibili])
+        XCTAssertEqual(model.rooms.map(\.platform), [.bilibili, .douyin])
         let calls = await douyin.searches
-        XCTAssertEqual(calls, 0)
+        XCTAssertEqual(calls, 1)
         XCTAssertTrue(model.issues.isEmpty)
     }
 
-    func testSelectingDouyinSearchClearsEarlierResultsWithoutRequest() async {
+    func testSelectingDouyinSearchReplacesEarlierResults() async {
         let bili = BrowseProvider(platform: .bilibili)
         let douyin = BrowseProvider(platform: .douyin)
         let model = BrowseModel(service: LiveService(providers: [bili, douyin]))
@@ -38,11 +38,29 @@ final class BrowseModelTests: XCTestCase {
         XCTAssertFalse(model.rooms.isEmpty)
         model.selectedPlatform = .douyin
         await model.load(isSearch: true)
-        XCTAssertTrue(model.rooms.isEmpty)
+        XCTAssertEqual(model.rooms.map(\.platform), [.douyin])
         XCTAssertFalse(model.isLoading)
         let calls = await douyin.searches
-        XCTAssertEqual(calls, 0)
+        XCTAssertEqual(calls, 2)
     }
+    func testLoginRequiredPreservesOtherPlatformsResults() async {
+        let model = BrowseModel(service: LiveService(providers: [BrowseProvider(platform: .bilibili), LoginRequiredProvider()]))
+        model.keyword = "游戏"
+        await model.load(isSearch: true)
+        XCTAssertEqual(model.rooms.map(\.platform), [.bilibili])
+        XCTAssertEqual(model.issues.first?.platform, .douyin)
+        XCTAssertEqual(model.issues.first?.requiresLogin, true)
+        model.keyword = ""
+        await model.load(isSearch: true)
+        XCTAssertTrue(model.issues.isEmpty)
+        XCTAssertTrue(model.rooms.isEmpty)
+    }
+}
+
+private struct LoginRequiredProvider: LiveProvider {
+    let platform = LivePlatform.douyin
+    func recommendations(page: Int) async throws -> RoomPage { RoomPage(rooms: [], hasMore: false) }
+    func search(keyword: String, page: Int) async throws -> RoomPage { throw LiveError.loginRequired(.douyin) }
 }
 
 private actor BrowseProvider: LiveProvider {
