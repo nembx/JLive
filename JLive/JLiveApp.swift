@@ -5,8 +5,6 @@ import JLiveCore
 struct JLiveApp: App {
     @State private var library = LibraryStore()
     @State private var externalRoom: LiveRoom?
-    @State private var account: AccountStore
-    @State private var douyinAccount: DouyinAccountStore
     private let service: LiveService
 
     init() {
@@ -18,8 +16,7 @@ struct JLiveApp: App {
         let service = LiveService.standard()
         #endif
         self.service = service
-        _account = State(initialValue: AccountStore(service: service))
-        _douyinAccount = State(initialValue: DouyinAccountStore(service: service))
+        LegacyAccountCleanup.run()
         #if DEBUG
         if let index = CommandLine.arguments.firstIndex(of: "--open-room"),
            CommandLine.arguments.indices.contains(index + 1),
@@ -41,8 +38,6 @@ struct JLiveApp: App {
             }
             .tint(JLiveTheme.accent)
             .environment(library)
-            .environment(account)
-            .environment(douyinAccount)
             .preferredColorScheme(library.appearance.colorScheme)
             .onOpenURL { url in
                 guard url.scheme == "jlive", let platform = LivePlatform(rawValue: url.host ?? ""),
@@ -56,8 +51,6 @@ struct JLiveApp: App {
                         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("完成") { externalRoom = nil } } }
                 }
                 .environment(library)
-                .environment(account)
-                .environment(douyinAccount)
                 .preferredColorScheme(library.appearance.colorScheme)
                 .tint(JLiveTheme.accent)
             }

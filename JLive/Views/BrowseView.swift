@@ -7,12 +7,10 @@ struct BrowseView: View {
     @State private var model: BrowseModel
     @State private var showingAddRoom = false
     @State private var showingSearch = false
-    @State private var showingDouyinLogin = false
     @State private var searchText = ""
     @State private var directRoom: LiveRoom?
     @FocusState private var searchFocused: Bool
     @Environment(\.dismiss) private var dismiss
-    @Environment(DouyinAccountStore.self) private var douyinAccount
 
     init(service: LiveService, isSearch: Bool) {
         self.service = service
@@ -58,14 +56,10 @@ struct BrowseView: View {
                     Button { searchFocused = false; showingAddRoom = true } label: { Image(systemName: "link") }
                         .accessibilityLabel("打开直播间链接")
                 }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("收起键盘") { searchFocused = false }
-                }
             }
         }
-        .refreshable { await model.load(isSearch: isSearch) }
-        .task(id: model.requestKey) { await model.load(isSearch: isSearch) }
+        .refreshable { await model.refresh(isSearch: isSearch) }
+        .task(id: model.requestKey) { await model.loadIfNeeded(isSearch: isSearch) }
         .task {
             if isSearch {
                 try? await Task.sleep(for: .milliseconds(200))
@@ -73,10 +67,6 @@ struct BrowseView: View {
             }
         }
         .onDisappear { searchFocused = false }
-        .onChange(of: douyinAccount.revision) {
-            if isSearch && !model.keyword.isEmpty { Task { await model.load(isSearch: true) } }
-        }
-        .sheet(isPresented: $showingDouyinLogin) { DouyinLoginView() }
         .sheet(isPresented: $showingAddRoom) {
             AddRoomSheet { room in directRoom = room }
                 .presentationDetents([.medium])
@@ -137,36 +127,35 @@ struct BrowseView: View {
     }
 
     @ViewBuilder private var content: some View {
-        if isSearch && model.keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            EmptyState(symbol: "magnifyingglass", title: "找到你喜欢的直播", message: "搜索 B站、虎牙、斗鱼和抖音\n输入关键词后点击搜索")
+        if isSearch && model.selectedPlatform?.supportsSearch == false {
+            EmptyState(symbol: "link", title: "通过链接打开抖音直播", message: "抖音关键词搜索需要登录，JLive 免登录使用\n点右上角粘贴直播间链接或输入房间号")
+                .contentShape(Rectangle()).onTapGesture { searchFocused = false }
+        } else if isSearch && model.keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            EmptyState(symbol: "magnifyingglass", title: "找到你喜欢的直播", message: "搜索 B站、虎牙和斗鱼\n输入关键词后点击搜索")
                 .contentShape(Rectangle()).onTapGesture { searchFocused = false }
         } else {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text(isSearch ? "搜索结果" : "正在直播").font(.system(size: 19, weight: .bold))
                     Spacer()
-                    if !model.rooms.isEmpty { Text("\(model.rooms.count) 个直播间").font(.caption).foregroundStyle(.secondary) }
+                    // The list stays on screen while it is updated; pull-to-refresh already shows its own indicator.
+                    if model.isLoading && !model.rooms.isEmpty && !model.isRefreshing {
+                        ProgressView().controlSize(.small)
+                    } else if !model.rooms.isEmpty {
+                        Text("\(model.rooms.count) 个直播间").font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 if !model.issues.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(model.issues) { issue in
                             Text("\(issue.platform.name)：\(issue.message)").font(.caption).foregroundStyle(.secondary)
-                            if issue.platform == .douyin && issue.requiresLogin {
-                                Button(douyinAccount.isLoggedIn ? "重新登录抖音" : "登录抖音") {
-                                    searchFocused = false
-                                    showingDouyinLogin = true
-                                }.font(.subheadline.weight(.semibold)).accessibilityIdentifier("douyinSearchLogin")
-                            }
-                            if isSearch && issue.platform == .douyin, let url = douyinWebSearchURL {
-                                Link("在抖音官网搜索", destination: url).font(.caption)
-                            }
                         }
                         Button("重新加载") { Task { await model.load(isSearch: isSearch) } }.font(.caption.bold())
                     }
                     .padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     .background(JLiveTheme.surface, in: RoundedRectangle(cornerRadius: 12))
                 }
-                if model.isLoading {
+                if model.isLoading && model.rooms.isEmpty {
                     ProgressView("正在寻找精彩…").frame(maxWidth: .infinity).padding(.vertical, 70)
                 } else if model.hasLoaded && model.rooms.isEmpty {
                     EmptyState(symbol: "antenna.radiowaves.left.and.right", title: model.issues.isEmpty ? "还没有找到直播间" : "暂时无法加载", message: "试试其他关键词、切换平台，或下拉刷新。")
@@ -188,13 +177,6 @@ struct BrowseView: View {
                 }
             }
         }
-    }
-
-    private var douyinWebSearchURL: URL? {
-        let base = URL(string: "https://www.douyin.com/search/")!
-        var url = URLComponents(url: base.appendingPathComponent(model.keyword), resolvingAgainstBaseURL: false)
-        url?.queryItems = [URLQueryItem(name: "type", value: "live")]
-        return url?.url
     }
 }
 

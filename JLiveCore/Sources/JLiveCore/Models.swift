@@ -27,7 +27,8 @@ public enum LivePlatform: String, CaseIterable, Codable, Identifiable, Sendable 
         }
     }
     public var supportsDiscovery: Bool { true }
-    public var supportsSearch: Bool { true }
+    /// Douyin only answers keyword search for logged-in accounts, and JLive works without accounts.
+    public var supportsSearch: Bool { self != .douyin }
     public var supportsNativePlayback: Bool { true }
     public var supportsChat: Bool { true }
 

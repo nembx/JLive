@@ -4,14 +4,10 @@ import JLiveCore
 struct SettingsView: View {
     let service: LiveService
     @Environment(LibraryStore.self) private var library
-    @Environment(AccountStore.self) private var account
-    @Environment(DouyinAccountStore.self) private var douyinAccount
     @State private var exporting = false
     @State private var importing = false
     @State private var backup: LibraryBackupDocument?
     @State private var message: String?
-    @State private var showingLogin = false
-    @State private var showingDouyinLogin = false
 
     /// Taken from the bundle so the number follows `MARKETING_VERSION` in project.yml.
     private static var version: String {
@@ -50,14 +46,6 @@ struct SettingsView: View {
                     }
                     .accessibilityIdentifier("appearancePicker")
                 }
-                Section("B站账号") {
-                    if account.isLoggedIn {
-                        Label(account.name, systemImage: "person.crop.circle")
-                        Button("退出登录", role: .destructive) { Task { await account.logout() } }
-                    } else {
-                        Button("登录 B站") { showingLogin = true }
-                    }
-                }
                 Section("平台接入") {
                     ForEach(LivePlatform.allCases) { platform in
                         HStack {
@@ -67,17 +55,6 @@ struct SettingsView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                }
-                Section("抖音账号") {
-                    if douyinAccount.isLoggedIn {
-                        Label("已保存搜索会话", systemImage: "person.crop.circle.badge.checkmark")
-                        Button("退出抖音登录", role: .destructive) { Task { await douyinAccount.logout() } }
-                            .disabled(douyinAccount.isChecking)
-                    } else {
-                        Button("登录抖音") { showingDouyinLogin = true }
-                    }
-                    Text("关键词搜索需要登录。登录失效时可在搜索页重新登录；推荐和打开直播间无需登录。")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Section("收藏备份") {
                     Button("导出收藏") {
@@ -100,8 +77,6 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("我的")
-            .sheet(isPresented: $showingLogin) { BilibiliLoginView() }
-            .sheet(isPresented: $showingDouyinLogin) { DouyinLoginView() }
             .fileExporter(isPresented: $exporting, document: backup, contentType: .json, defaultFilename: "JLive-收藏") { result in
                 if case .failure(let error) = result { message = error.localizedDescription }
             }

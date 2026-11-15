@@ -7,7 +7,6 @@ struct RoomDetailView: View {
     let room: LiveRoom
     let service: LiveService
     @Environment(LibraryStore.self) private var library
-    @Environment(AccountStore.self) private var account
     @State private var model: PlayerModel
     @State private var chat: ChatModel
     @State private var showingWebsite = false
@@ -58,7 +57,6 @@ struct RoomDetailView: View {
                         .accessibilityLabel(library.contains(model.room) ? "取消收藏" : "收藏直播间")
                     }
                     if model.room.platform.supportsChat { ChatPanel(chat: chat) }
-                    if model.room.platform == .bilibili { ChatComposer(room: model.room, service: service) }
                     if !model.room.platform.supportsNativePlayback {
                         VStack(alignment: .leading, spacing: 10) {
                             Label("前往平台观看", systemImage: "safari").font(.headline)
@@ -109,9 +107,6 @@ struct RoomDetailView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .background, !presentation.isInPictureInPicture { model.suspend() }
             if phase == .active { model.resume() }
-        }
-        .onChange(of: account.credentials?.uid) { _, _ in
-            if !needsLoad { chat.restart() }
         }
     }
 
