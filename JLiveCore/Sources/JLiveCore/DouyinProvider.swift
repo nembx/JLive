@@ -57,6 +57,68 @@ public actor DouyinProvider: LiveProvider {
         return try Self.parseRecommendations(data)
     }
 
+    public func categories() async throws -> [LiveCategoryGroup] {
+        let html = try await client.text(LivePlatform.douyin.homeURL, headers: try await headers())
+        return try Self.parseCategoriesHTML(html)
+    }
+
+    static func parseCategoriesHTML(_ html: String) throws -> [LiveCategoryGroup] {
+        var decoded = try flightState(html)
+        if decoded.isEmpty { decoded = html }
+        guard let start = decoded.range(of: "\"categoryData\":")?.upperBound else { throw LiveError.invalidResponse }
+        // Decode the array from React's embedded state. Strings may include brackets or escapes.
+        let rest = decoded[start...].drop(while: { $0.isWhitespace })
+        guard rest.first == "[" else { throw LiveError.invalidResponse }
+        var depth = 0, inString = false, escaped = false
+        for index in rest.indices {
+            let character = rest[index]
+            if inString {
+                if escaped { escaped = false }
+                else if character == "\\" { escaped = true }
+                else if character == "\"" { inString = false }
+            } else if character == "\"" { inString = true }
+            else if character == "[" { depth += 1 }
+            else if character == "]" {
+                depth -= 1
+                if depth == 0 {
+                    let data = try JSONDecoder().decode(JSONValue.self, from: Data(rest[...index].utf8))
+                    return try parseCategories(data)
+                }
+            }
+        }
+        throw LiveError.invalidResponse
+    }
+
+    static func parseCategories(_ data: JSONValue) throws -> [LiveCategoryGroup] {
+        func category(_ item: JSONValue, parent: String) -> LiveCategory? {
+            let partition = item["partition"]
+            let id = partition["id_str"].string, type = partition["type"].string, title = partition["title"].string
+            guard !id.isEmpty, !type.isEmpty, !title.isEmpty else { return nil }
+            return LiveCategory(platform: .douyin, categoryID: "\(id),\(type)", parentID: parent, name: title)
+        }
+        return try data.requiredArray().compactMap { item in
+            guard let root = category(item, parent: "") else { return nil }
+            let id = root.categoryID
+            let parent = LiveCategory(platform: .douyin, categoryID: id, parentID: id, name: root.name)
+            var seen: Set<String> = [id]
+            let children = try item["sub_partition"].requiredArray().compactMap { child -> LiveCategory? in
+                guard let value = category(child, parent: id), seen.insert(value.categoryID).inserted else { return nil }
+                return value
+            }
+            return LiveCategoryGroup(id: id, name: root.name, children: [parent] + children)
+        }
+    }
+
+    public func categoryRooms(category: LiveCategory, page: Int) async throws -> RoomPage {
+        let parts = category.categoryID.split(separator: ",")
+        guard category.platform == platform, parts.count == 2, parts.allSatisfy({ $0.allSatisfy(\.isNumber) }) else { throw LiveError.invalidResponse }
+        var query = webParameters
+        query.merge(["enter_from": "link_share", "count": "15", "offset": String(max(0, page - 1) * 15),
+            "partition": String(parts[0]), "partition_type": String(parts[1]), "req_from": "2",
+            "screen_width": "1920", "screen_height": "1080"], uniquingKeysWith: { _, b in b })
+        return try Self.parseRecommendations(await request("/webcast/web/partition/detail/room/v2/", query: query))
+    }
+
     static func parseRecommendations(_ data: JSONValue) throws -> RoomPage {
         let list = try data["data"].requiredArray()
         var seen = Set<String>()
@@ -222,14 +284,7 @@ public actor DouyinProvider: LiveProvider {
 
     static func parseRoomHTML(_ html: String) throws -> JSONValue {
         // React flight strings are JSON strings containing an additional JSON document.
-        let pattern = #"self\.__next_f\.push\(\[\d+,\s*("(?:\\.|[^"\\])*")\]\)"#
-        let regex = try NSRegularExpression(pattern: pattern)
-        var decoded = ""
-        for match in regex.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
-            guard let range = Range(match.range(at: 1), in: html),
-                  let string = try? JSONDecoder().decode(String.self, from: Data(html[range].utf8)) else { continue }
-            decoded += string
-        }
+        var decoded = try flightState(html)
         // Some versions use the older SSR representation directly inside the page.
         if decoded.isEmpty { decoded = html.replacingOccurrences(of: #"\""#, with: "\"") }
         var remaining = decoded[...]
@@ -244,6 +299,31 @@ public actor DouyinProvider: LiveProvider {
             remaining = remaining[marker.upperBound...]
         }
         throw LiveError.invalidResponse
+    }
+
+    private static func flightState(_ html: String) throws -> String {
+        // Match only the short prefix. ICU's regex stack can silently skip the large
+        // escaped strings in current home pages, so scan their boundaries linearly.
+        let regex = try NSRegularExpression(pattern: #"self\.__(?:next|pace)_f\.push\(\[\d+,\s*"#)
+        var decoded = ""
+        for match in regex.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
+            guard let prefix = Range(match.range, in: html) else { continue }
+            let rest = html[prefix.upperBound...]
+            guard rest.first == "\"" else { continue }
+            var escaped = false
+            for index in rest.dropFirst().indices {
+                let character = rest[index]
+                if escaped { escaped = false }
+                else if character == "\\" { escaped = true }
+                else if character == "\"" {
+                    if let text = try? JSONDecoder().decode(String.self, from: Data(rest[...index].utf8)) {
+                        decoded += text
+                    }
+                    break
+                }
+            }
+        }
+        return decoded
     }
 
     public func detail(room: LiveRoom) async throws -> LiveRoom {

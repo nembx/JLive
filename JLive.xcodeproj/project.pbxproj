@@ -26,6 +26,7 @@
 		BDA9F8BC9013EFE95C13D399 /* PlayerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F541742BA24955DD772DC6ED /* PlayerModel.swift */; };
 		D9905B4C884E3592A936EA13 /* JLiveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976CB76C96A5F33F8191AFAB /* JLiveApp.swift */; };
 		DC9DAC99FC3396029BFD0AA4 /* JLiveCore in Frameworks */ = {isa = PBXBuildFile; productRef = BDFBB56E718136750A261EEC /* JLiveCore */; };
+		DF6162EB830A80EC17A8E1D4 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80A681711D47D8494476ED21 /* CategoriesView.swift */; };
 		EF1EEBC6384C77228F398048 /* LegacyAccountCleanup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A595E1E4FCFE361033A346D2 /* LegacyAccountCleanup.swift */; };
 		F1C928469A666DF8F5081ED0 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92590DEB1507ED9BBA235F1C /* Components.swift */; };
 		F2BB96937D17FDB05263AA8C /* ChatModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 082B2C68D6E961B7FEDF9996 /* ChatModel.swift */; };
@@ -62,6 +63,7 @@
 		71549EA611A7047BC24E2AC7 /* UIFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIFixtures.swift; sourceTree = "<group>"; };
 		73733D8D7EA6C20B0D52ED4E /* LibraryBackupDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryBackupDocument.swift; sourceTree = "<group>"; };
 		746880E186B1A550FB88DA69 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		80A681711D47D8494476ED21 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoriesView.swift; sourceTree = "<group>"; };
 		9043BBC4AFDFF9E4C3007C3E /* LivePlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePlayerView.swift; sourceTree = "<group>"; };
 		90B7EFC2D3DC00A555A912C0 /* JLive.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = JLive.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9192AECA3CFD557E9C6E4EAD /* BrowseModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseModel.swift; sourceTree = "<group>"; };
@@ -174,6 +176,7 @@
 			isa = PBXGroup;
 			children = (
 				4DA8155B8CB3CB194D1A7140 /* BrowseView.swift */,
+				80A681711D47D8494476ED21 /* CategoriesView.swift */,
 				A0AB278B123B48613A498D6B /* ChatViews.swift */,
 				92590DEB1507ED9BBA235F1C /* Components.swift */,
 				746880E186B1A550FB88DA69 /* HistoryView.swift */,
@@ -328,6 +331,7 @@
 			files = (
 				80915E9D8AC864CFBDD8BD85 /* BrowseModel.swift in Sources */,
 				AF0EDAAD002AB867937897E1 /* BrowseView.swift in Sources */,
+				DF6162EB830A80EC17A8E1D4 /* CategoriesView.swift in Sources */,
 				F2BB96937D17FDB05263AA8C /* ChatModel.swift in Sources */,
 				35316522142CF8DE7F844AE8 /* ChatViews.swift in Sources */,
 				F1C928469A666DF8F5081ED0 /* Components.swift in Sources */,
@@ -457,7 +461,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.7.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -576,7 +580,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.7.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

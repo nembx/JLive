@@ -11,6 +11,10 @@ public struct HuyaProvider: LiveProvider {
         let result = try await client.get(try endpoint("https://www.huya.com/cache.php", [
             "m": "LiveList", "do": "getLiveListByPage", "tagAll": "0", "page": String(page)
         ]), headers: ["Referer": "https://www.huya.com/"])
+        return try Self.parseRooms(result, page: page)
+    }
+
+    static func parseRooms(_ result: JSONValue, page: Int) throws -> RoomPage {
         guard result["status"].int == 200 else { throw LiveError.platform(result["message"].string) }
         let data = result["data"]
         let rooms = try data["datas"].requiredArray().compactMap { item -> LiveRoom? in
@@ -53,7 +57,12 @@ public struct DouyuProvider: LiveProvider {
 
     public func recommendations(page: Int) async throws -> RoomPage {
         let result = try await client.get(try endpoint("https://www.douyu.com/japi/weblist/apinc/allpage/6/\(page)"), headers: ["Referer": "https://www.douyu.com/"])
-        guard !result["error"].isNull, result["error"].int == 0 else { throw LiveError.platform(result["msg"].string) }
+        return try Self.parseRooms(result, page: page)
+    }
+
+    static func parseRooms(_ result: JSONValue, page: Int) throws -> RoomPage {
+        let status = result["error"].isNull ? result["code"] : result["error"]
+        guard !status.isNull, status.int == 0 else { throw LiveError.platform(result["msg"].string) }
         let data = result["data"]
         let rooms = try data["rl"].requiredArray().filter { $0["type"].int == 1 }.compactMap { item -> LiveRoom? in
             guard !item["rid"].string.isEmpty else { return nil }

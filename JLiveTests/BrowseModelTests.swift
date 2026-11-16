@@ -20,7 +20,7 @@ final class BrowseModelTests: XCTestCase {
     func testCombinedSearchSkipsDouyinWhichNeedsAnAccount() async {
         let bili = BrowseProvider(platform: .bilibili)
         let douyin = BrowseProvider(platform: .douyin)
-        let model = BrowseModel(service: LiveService(providers: [bili, douyin]))
+        let model = BrowseModel(service: LiveService(providers: [bili, douyin]), platform: nil)
         model.keyword = "主播"
         await model.load(isSearch: true)
         XCTAssertEqual(model.rooms.map(\.platform), [.bilibili])
@@ -32,7 +32,7 @@ final class BrowseModelTests: XCTestCase {
     func testSelectingDouyinSearchClearsEarlierResultsWithoutRequest() async {
         let bili = BrowseProvider(platform: .bilibili)
         let douyin = BrowseProvider(platform: .douyin)
-        let model = BrowseModel(service: LiveService(providers: [bili, douyin]))
+        let model = BrowseModel(service: LiveService(providers: [bili, douyin]), platform: nil)
         model.keyword = "主播"
         await model.loadIfNeeded(isSearch: true)
         XCTAssertFalse(model.rooms.isEmpty)
@@ -136,12 +136,75 @@ final class BrowseModelTests: XCTestCase {
         XCTAssertFalse(empty.rooms.isEmpty, "失败的结果不缓存，回到页面时重试")
         XCTAssertTrue(empty.issues.isEmpty)
     }
+
+    func testCategorySelectionAndPaginationAreCachedSeparatelyForEachPlatform() async {
+        let bili = BrowseProvider(platform: .bilibili)
+        let huya = BrowseProvider(platform: .huya)
+        let model = BrowseModel(service: LiveService(providers: [bili, huya]))
+        let game = LiveCategory(platform: .bilibili, categoryID: "86", parentID: "2", name: "英雄联盟")
+        let music = LiveCategory(platform: .bilibili, categoryID: "235", parentID: "3", name: "音乐")
+        let huyaGame = LiveCategory(platform: .huya, categoryID: "1", parentID: "1", name: "英雄联盟")
+        await model.loadIfNeeded(isSearch: false)
+        model.selectedCategory = game
+        await model.loadIfNeeded(isSearch: false)
+        await model.loadMore(isSearch: false)
+        XCTAssertEqual(model.rooms.map(\.roomID), ["86-1", "86-2"])
+        model.selectedCategory = music
+        await model.loadIfNeeded(isSearch: false)
+        XCTAssertEqual(model.rooms.map(\.roomID), ["235-1"])
+        model.selectedPlatform = .huya
+        XCTAssertNil(model.selectedCategory)
+        model.selectedCategory = game
+        XCTAssertNil(model.selectedCategory, "不能把其他平台的分区传给当前平台")
+        model.selectedCategory = huyaGame
+        await model.loadIfNeeded(isSearch: false)
+        model.selectedPlatform = .bilibili
+        XCTAssertEqual(model.selectedCategory, music)
+        await model.loadIfNeeded(isSearch: false)
+        model.selectedCategory = game
+        await model.loadIfNeeded(isSearch: false)
+        XCTAssertEqual(model.rooms.map(\.roomID), ["86-1", "86-2"])
+        XCTAssertFalse(model.hasMore)
+        let calls = await bili.categoryCalls
+        XCTAssertEqual(calls, ["86:1", "86:2", "235:1"])
+        model.selectedCategory = nil
+        await model.loadIfNeeded(isSearch: false)
+        XCTAssertEqual(model.rooms.map(\.roomID), ["1"])
+        let recommendations = await bili.recommendationCalls
+        XCTAssertEqual(recommendations, 1, "推荐列表也独立缓存")
+    }
+
+    func testCategoryRefreshKeepsItsListAndOldRequestsCannotReplaceANewSelection() async {
+        let provider = BrowseProvider(platform: .bilibili)
+        let model = BrowseModel(service: LiveService(providers: [provider]))
+        let game = LiveCategory(platform: .bilibili, categoryID: "86", parentID: "2", name: "英雄联盟")
+        model.selectedCategory = game
+        await model.loadIfNeeded(isSearch: false)
+        await provider.hold()
+        let refresh = Task { await model.refresh(isSearch: false) }
+        while await !provider.isWaiting { try? await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(model.rooms.map(\.roomID), ["86-1"])
+        model.selectedCategory = nil
+        // Release only the provider's holding flag; the old response remains suspended.
+        await provider.allowNewRequests()
+        await model.loadIfNeeded(isSearch: false)
+        XCTAssertEqual(model.rooms.map(\.roomID), ["1"])
+        await provider.release()
+        await refresh.value
+        XCTAssertEqual(model.rooms.map(\.roomID), ["1"], "旧分区的刷新不能覆盖新选择")
+        model.selectedCategory = game
+        await model.loadIfNeeded(isSearch: false)
+        XCTAssertEqual(model.rooms.map(\.roomID), ["86-1"])
+        let calls = await provider.categoryCalls
+        XCTAssertEqual(calls.count, 2, "旧请求不能删除已有分区缓存")
+    }
 }
 
 private actor BrowseProvider: LiveProvider {
     nonisolated let platform: LivePlatform
     var searches = 0
     var recommendationCalls = 0
+    var categoryCalls: [String] = []
     private var failing = false
     private var holding = false
     private var gate: CheckedContinuation<Void, Never>?
@@ -151,6 +214,7 @@ private actor BrowseProvider: LiveProvider {
 
     func setFailing(_ value: Bool) { failing = value }
     func hold() { holding = true }
+    func allowNewRequests() { holding = false }
     func release() {
         holding = false
         gate?.resume()
@@ -167,5 +231,11 @@ private actor BrowseProvider: LiveProvider {
     func search(keyword: String, page: Int) async throws -> RoomPage {
         searches += 1
         return try await recommendations(page: page)
+    }
+    func categoryRooms(category: LiveCategory, page: Int) async throws -> RoomPage {
+        categoryCalls.append("\(category.categoryID):\(page)")
+        if holding { await withCheckedContinuation { gate = $0 } }
+        if failing { throw LiveError.http(503) }
+        return RoomPage(rooms: [LiveRoom(platform: platform, roomID: "\(category.categoryID)-\(page)", title: category.name, streamer: "主播", isLive: true)], hasMore: page < 2)
     }
 }

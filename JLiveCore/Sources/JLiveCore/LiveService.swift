@@ -4,12 +4,16 @@ public protocol LiveProvider: Sendable {
     var platform: LivePlatform { get }
     func recommendations(page: Int) async throws -> RoomPage
     func search(keyword: String, page: Int) async throws -> RoomPage
+    func categories() async throws -> [LiveCategoryGroup]
+    func categoryRooms(category: LiveCategory, page: Int) async throws -> RoomPage
     func detail(room: LiveRoom) async throws -> LiveRoom
     func playback(roomID: String, quality: Int?) async throws -> PlaybackInfo
     func chat(roomID: String) async throws -> LiveChatEndpoint
 }
 
 public extension LiveProvider {
+    func categories() async throws -> [LiveCategoryGroup] { throw LiveError.unsupported }
+    func categoryRooms(category: LiveCategory, page: Int) async throws -> RoomPage { throw LiveError.unsupported }
     func detail(room: LiveRoom) async throws -> LiveRoom { room }
     func playback(roomID: String, quality: Int?) async throws -> PlaybackInfo { throw LiveError.unsupported }
     func chat(roomID: String) async throws -> LiveChatEndpoint { throw LiveError.unsupported }
@@ -30,6 +34,7 @@ public struct DiscoveryResult: Sendable {
 
 public struct LiveService: Sendable {
     private let providers: [LivePlatform: any LiveProvider]
+    private let categoryCache = CategoryCache()
 
     public init(providers: [any LiveProvider]) {
         self.providers = Dictionary(providers.map { ($0.platform, $0) }, uniquingKeysWith: { first, _ in first })
@@ -40,16 +45,23 @@ public struct LiveService: Sendable {
         return LiveService(providers: [BilibiliProvider(client: client), HuyaProvider(client: client), DouyuProvider(client: client), DouyinProvider(client: client)])
     }
 
-    public func discover(platforms: Set<LivePlatform>, page: Int = 1, keyword: String = "") async throws -> DiscoveryResult {
+    public func categories(platform: LivePlatform, refreshing: Bool = false) async throws -> [LiveCategoryGroup] {
+        guard let provider = providers[platform] else { throw LiveError.unsupported }
+        return try await categoryCache.groups(for: provider, refreshing: refreshing)
+    }
+
+    public func discover(platforms: Set<LivePlatform>, page: Int = 1, keyword: String = "", category: LiveCategory? = nil) async throws -> DiscoveryResult {
+        if let category, platforms != [category.platform] { throw LiveError.invalidResponse }
         let keyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         let results = await withTaskGroup(of: ProviderResult.self) { group in
             for platform in LivePlatform.allCases where platforms.contains(platform) {
                 guard let provider = providers[platform] else { continue }
                 group.addTask {
                     do {
-                        let result = try await keyword.isEmpty
-                            ? provider.recommendations(page: page)
-                            : provider.search(keyword: keyword, page: page)
+                        let result: RoomPage
+                        if !keyword.isEmpty { result = try await provider.search(keyword: keyword, page: page) }
+                        else if let category { result = try await provider.categoryRooms(category: category, page: page) }
+                        else { result = try await provider.recommendations(page: page) }
                         return ProviderResult(platform: platform, page: result, error: nil, requiresLogin: false)
                     } catch {
                         let requiresLogin: Bool

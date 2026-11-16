@@ -4,7 +4,7 @@ import JLiveCore
 struct LibraryView: View {
     let service: LiveService
     @Environment(LibraryStore.self) private var library
-    @State private var filter = FavoriteFilter.all
+    @State private var filter = FavoriteFilter.live
     @State private var showingAddRoom = false
     @State private var directRoom: LiveRoom?
 
@@ -31,12 +31,12 @@ struct LibraryView: View {
                     if rooms.isEmpty {
                         EmptyState(symbol: filter == .live ? "antenna.radiowaves.left.and.right" : "heart",
                             title: library.favorites.isEmpty ? "收藏你的第一个直播间" : (filter == .live ? "暂时没有主播开播" : "暂时没有未开播的主播"),
-                            message: library.favorites.isEmpty ? "打开直播间后点击爱心收藏，\n也可以直接添加直播间链接。" : "切换到全部查看收藏，或下拉刷新开播状态。")
+                            message: library.favorites.isEmpty ? "打开直播间后点击爱心收藏，\n也可以直接添加直播间链接。" : "切换开播状态查看收藏，或下拉刷新。")
                     } else {
                         Text(library.refreshMessage ?? "下拉刷新开播状态，长按卡片管理收藏")
                             .font(.caption).foregroundStyle(.secondary)
-                        if filter == .all, library.favorites.contains(where: { $0.isLive == nil }) {
-                            Text("状态待更新的直播间保留在全部中")
+                        if filter == .offline, rooms.contains(where: { $0.isLive == nil }) {
+                            Text("包含状态待更新的直播间，下拉可查询最新状态")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         RoomGrid(rooms: rooms, service: service)

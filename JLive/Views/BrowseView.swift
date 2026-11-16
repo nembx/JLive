@@ -7,6 +7,7 @@ struct BrowseView: View {
     @State private var model: BrowseModel
     @State private var showingAddRoom = false
     @State private var showingSearch = false
+    @State private var categoryPlatform: LivePlatform?
     @State private var searchText = ""
     @State private var directRoom: LiveRoom?
     @FocusState private var searchFocused: Bool
@@ -15,7 +16,7 @@ struct BrowseView: View {
     init(service: LiveService, isSearch: Bool) {
         self.service = service
         self.isSearch = isSearch
-        _model = State(initialValue: BrowseModel(service: service))
+        _model = State(initialValue: BrowseModel(service: service, platform: isSearch ? nil : .bilibili))
     }
 
     var body: some View {
@@ -23,7 +24,9 @@ struct BrowseView: View {
             if isSearch { page }
             else {
                 NavigationStack {
-                    page.navigationDestination(isPresented: $showingSearch) { BrowseView(service: service, isSearch: true) }
+                    page.navigationDestination(isPresented: $showingSearch) {
+                        BrowseView(service: service, isSearch: true)
+                    }
                 }
             }
         }
@@ -34,7 +37,8 @@ struct BrowseView: View {
             VStack(alignment: .leading, spacing: JLiveLayout.sectionSpacing) {
                 if isSearch { searchField.padding(.horizontal, JLiveLayout.pageInset) }
                 else { header.padding(.horizontal, JLiveLayout.pageInset) }
-                PlatformPicker(selection: $model.selectedPlatform)
+                PlatformPicker(selection: $model.selectedPlatform, allowsAll: isSearch)
+                if !isSearch { categoryPicker.padding(.horizontal, JLiveLayout.pageInset) }
                 content.padding(.horizontal, JLiveLayout.pageInset)
             }
             .padding(.top, 12).padding(.bottom, 24)
@@ -42,7 +46,7 @@ struct BrowseView: View {
         .background(JLiveTheme.background)
         .scrollDismissesKeyboard(.interactively)
         .toolbar(isSearch ? .visible : .hidden, for: .navigationBar)
-        .toolbar(isSearch ? .hidden : .visible, for: .tabBar)
+        .toolbar(isSearch ? .hidden : .automatic, for: .tabBar)
         .navigationTitle(isSearch ? "搜索" : "")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isSearch)
@@ -67,11 +71,37 @@ struct BrowseView: View {
             }
         }
         .onDisappear { searchFocused = false }
+        .sheet(item: $categoryPlatform) { platform in
+            CategoriesView(platform: platform, service: service, selection: model.selectedCategory) { category in
+                model.selectedCategory = category
+            }
+        }
         .sheet(isPresented: $showingAddRoom) {
             AddRoomSheet { room in directRoom = room }
                 .presentationDetents([.medium])
         }
         .navigationDestination(item: $directRoom) { room in RoomDetailView(room: room, service: service) }
+    }
+
+    private var categoryPicker: some View {
+        HStack {
+            Button { model.selectedCategory = nil } label: {
+                Text("推荐").font(.subheadline.weight(model.selectedCategory == nil ? .bold : .regular))
+                    .foregroundStyle(model.selectedCategory == nil ? JLiveTheme.accent : Color.secondary)
+                    .frame(minHeight: 44)
+            }.buttonStyle(.plain)
+            Spacer()
+            Button { categoryPlatform = model.selectedPlatform } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.grid.2x2")
+                    Text(model.selectedCategory?.name ?? "浏览分区").lineLimit(1)
+                    Image(systemName: "chevron.down").font(.caption)
+                }
+                .font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(minHeight: 44)
+                .background(JLiveTheme.surface, in: Capsule())
+            }
+            .buttonStyle(.plain).accessibilityIdentifier("browseCategories")
+        }
     }
 
     private var header: some View {
@@ -136,7 +166,7 @@ struct BrowseView: View {
         } else {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Text(isSearch ? "搜索结果" : "正在直播").font(.system(size: 19, weight: .bold))
+                    Text(isSearch ? "搜索结果" : (model.selectedCategory?.name ?? "正在直播")).font(.system(size: 19, weight: .bold))
                     Spacer()
                     // The list stays on screen while it is updated; pull-to-refresh already shows its own indicator.
                     if model.isLoading && !model.rooms.isEmpty && !model.isRefreshing {

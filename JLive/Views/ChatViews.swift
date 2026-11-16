@@ -76,7 +76,7 @@ struct ChatPanel: View {
                 statusLabel
                 Spacer()
             }
-            .padding(.leading, 15).padding(.trailing, 8).padding(.vertical, 8)
+            .padding(.horizontal, 16).padding(.vertical, 14)
             Divider()
             messages
         }
@@ -106,10 +106,11 @@ struct ChatPanel: View {
                         ChatRow(message: entry.message).id(entry.id)
                     }
                 }
-                .padding(15)
+                .padding(.horizontal, 16).padding(.vertical, 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(height: 260)
+            .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
             .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in
                 if frozen == nil, !chat.entries.isEmpty { frozen = chat.entries }

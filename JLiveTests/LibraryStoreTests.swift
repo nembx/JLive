@@ -43,16 +43,15 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertFalse(store.isRefreshing)
     }
 
-    func testFavoriteFiltersKeepUnknownStatusOnlyInAll() {
+    func testTwoFavoriteFiltersKeepEveryRoomVisible() {
         let store = makeStore()
         let live = LiveRoom(platform: .bilibili, roomID: "1", title: "直播中", streamer: "A", isLive: true)
         let offline = LiveRoom(platform: .bilibili, roomID: "2", title: "未开播", streamer: "B", isLive: false)
         let unknown = room("3")
         [live, offline, unknown].forEach { store.toggle($0) }
         XCTAssertEqual(store.favorites(matching: .live), [live])
-        XCTAssertEqual(store.favorites(matching: .offline), [offline])
-        XCTAssertEqual(store.favorites(matching: .all).count, 3)
-        XCTAssertTrue(store.favorites(matching: .all).contains(unknown))
+        XCTAssertEqual(store.favorites(matching: .offline), [unknown, offline])
+        XCTAssertEqual(store.favorites(matching: .live).count + store.favorites(matching: .offline).count, 3)
     }
 
     func testHistoryOrdersDeduplicatesAndClearsWithoutChangingFavorites() {

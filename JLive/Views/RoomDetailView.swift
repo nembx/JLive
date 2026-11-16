@@ -78,6 +78,8 @@ struct RoomDetailView: View {
                 .padding(20)
                 .padding(.bottom, 12)
             }
+            .scrollBounceBehavior(.basedOnSize)
+            .accessibilityIdentifier("roomInformation")
         }
         .background(JLiveTheme.background)
         .navigationTitle(model.room.platform.name).navigationBarTitleDisplayMode(.inline)

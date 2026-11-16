@@ -59,10 +59,11 @@ struct PlatformBadge: View {
 
 struct PlatformPicker: View {
     @Binding var selection: LivePlatform?
+    var allowsAll = true
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
-                chip("全部", platform: nil)
+                if allowsAll { chip("全部", platform: nil) }
                 ForEach(LivePlatform.allCases) { platform in chip(platform.name, platform: platform) }
             }
             .padding(.horizontal, JLiveLayout.pageInset)

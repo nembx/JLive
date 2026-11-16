@@ -38,6 +38,7 @@ final class PlayerUITests: XCTestCase {
         app.buttons["搜索直播"].tap()
         let field = app.textFields["searchField"]
         XCTAssertTrue(field.waitForExistence(timeout: 4))
+        XCTAssertFalse(app.tabBars.buttons["发现"].exists)
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 4))
         XCTAssertFalse(app.buttons["收起键盘"].exists)
         // Tapping the empty area below the field puts the keyboard away.
@@ -102,10 +103,10 @@ final class PlayerUITests: XCTestCase {
         app.buttons["正在开播 · 1"].tap()
         XCTAssertTrue(app.buttons["room-bilibili:1"].exists)
         XCTAssertFalse(app.buttons["room-bilibili:3"].exists)
-        app.buttons["未开播 · 1"].tap()
+        XCTAssertFalse(app.buttons["全部 · 3"].exists)
+        app.buttons["未开播 · 2"].tap()
         XCTAssertTrue(app.buttons["room-bilibili:2"].exists)
         XCTAssertFalse(app.buttons["room-bilibili:1"].exists)
-        app.buttons["全部 · 3"].tap()
         XCTAssertTrue(app.buttons["room-bilibili:3"].exists)
         let cards = XCTAttachment(screenshot: app.screenshot())
         cards.name = "收藏卡片与开播筛选"; cards.lifetime = .keepAlways; add(cards)
@@ -115,6 +116,67 @@ final class PlayerUITests: XCTestCase {
         app.buttons["清空"].tap()
         app.buttons["清空记录"].tap()
         XCTAssertTrue(app.staticTexts["还没有观看记录"].waitForExistence(timeout: 4))
+    }
+
+    func testDiscoverCategorySelectionPaginationAndReturnToRecommendations() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--muted", "--ui-fixtures"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["room-bilibili:1"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["全部"].exists)
+        app.buttons["browseCategories"].tap()
+        let game = app.buttons["category-bilibili:2:86"]
+        XCTAssertTrue(game.waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["关闭"].exists)
+        let overview = XCTAttachment(screenshot: app.screenshot())
+        overview.name = "分区目录"; overview.lifetime = .keepAlways; add(overview)
+        let search = app.searchFields.firstMatch
+        if !search.exists { app.swipeDown() }
+        if search.exists {
+            search.tap()
+            search.typeText("网游")
+            XCTAssertTrue(game.exists)
+            XCTAssertFalse(app.staticTexts["没有匹配的分区"].exists, "匹配父分区时也应显示子分区")
+            XCTAssertFalse(app.buttons["category-bilibili:3:235"].exists)
+        }
+        let directory = XCTAttachment(screenshot: app.screenshot())
+        directory.name = "分区目录与筛选"; directory.lifetime = .keepAlways; add(directory)
+        game.tap()
+        let first = app.buttons["room-bilibili:101"]
+        XCTAssertTrue(first.waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["browseCategories"].label.contains("英雄联盟"))
+        app.buttons["加载更多"].tap()
+        XCTAssertTrue(app.buttons["room-bilibili:102"].waitForExistence(timeout: 4))
+        XCTAssertFalse(app.buttons["加载更多"].exists)
+        app.tabBars.buttons["收藏"].tap()
+        app.tabBars.buttons["发现"].tap()
+        XCTAssertTrue(app.buttons["room-bilibili:102"].exists, "回到发现页保留分区分页")
+        app.buttons["推荐"].tap()
+        XCTAssertTrue(app.buttons["room-bilibili:1"].waitForExistence(timeout: 4))
+        XCTAssertFalse(first.exists)
+        app.buttons["browseCategories"].tap()
+        XCTAssertTrue(game.waitForExistence(timeout: 4))
+        game.tap()
+        XCTAssertTrue(app.buttons["room-bilibili:102"].waitForExistence(timeout: 4))
+        let result = XCTAttachment(screenshot: app.screenshot())
+        result.name = "分区直播列表与缓存"; result.lifetime = .keepAlways; add(result)
+    }
+
+    func testRoomInformationAndChatSpacing() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--muted", "--ui-fixtures"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["room-bilibili:2"].waitForExistence(timeout: 4))
+        app.buttons["room-bilibili:2"].tap()
+        XCTAssertTrue(app.scrollViews["roomInformation"].waitForExistence(timeout: 4))
+        XCTAssertFalse(app.tabBars.buttons["发现"].exists, "直播间应隐藏底部标签栏")
+        XCTAssertTrue(app.staticTexts["聊天"].exists)
+        let info = XCTAttachment(screenshot: app.screenshot())
+        info.name = "直播信息与聊天留白"; info.lifetime = .keepAlways; add(info)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.tabBars.buttons["发现"].waitForExistence(timeout: 4))
     }
 
     func testFullscreenKeepsSettingsAndReturnsToInlinePlayer() throws {

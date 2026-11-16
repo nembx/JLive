@@ -77,6 +77,39 @@ public actor BilibiliProvider: LiveProvider {
         return RoomPage(rooms: rooms, hasMore: !rooms.isEmpty)
     }
 
+    public func categories() async throws -> [LiveCategoryGroup] {
+        try Self.parseCategories(await request("/room/v1/Area/getList", query: ["need_entrance": "1", "parent_id": "0"]))
+    }
+
+    static func parseCategories(_ data: JSONValue) throws -> [LiveCategoryGroup] {
+        try data.requiredArray().compactMap { item in
+            let parent = item["id"].string, name = item["name"].string
+            guard !parent.isEmpty, !name.isEmpty else { return nil }
+            var seen = Set<String>()
+            let children = try item["list"].requiredArray().compactMap { child -> LiveCategory? in
+                let id = child["id"].string, title = child["name"].string
+                guard !id.isEmpty, !title.isEmpty, seen.insert(id).inserted else { return nil }
+                return LiveCategory(platform: .bilibili, categoryID: id, parentID: parent, name: title, imageURL: imageURL(child["pic"].string))
+            }
+            return LiveCategoryGroup(id: parent, name: name, children: children)
+        }
+    }
+
+    public func categoryRooms(category: LiveCategory, page: Int) async throws -> RoomPage {
+        guard category.platform == platform else { throw LiveError.invalidResponse }
+        let data = try await request("/xlive/web-interface/v1/second/getListByArea", query: [
+            "platform": "web", "parent_area_id": category.parentID, "area_id": category.categoryID,
+            "sort": "online", "page_size": "30", "page": String(max(1, page))
+        ], signed: true)
+        return try Self.parseCategoryRooms(data)
+    }
+
+    static func parseCategoryRooms(_ data: JSONValue) throws -> RoomPage {
+        let rooms = try data["list"].requiredArray().compactMap(Self.room)
+        let hasMore = data["has_more"].isNull ? !rooms.isEmpty : data["has_more"].int == 1
+        return RoomPage(rooms: rooms, hasMore: hasMore)
+    }
+
     public func search(keyword: String, page: Int) async throws -> RoomPage {
         let data = try await request("https://api.bilibili.com/x/web-interface/search/type", query: [
             "search_type": "live", "cover_type": "user_cover", "keyword": keyword,

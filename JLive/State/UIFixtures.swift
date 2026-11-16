@@ -37,5 +37,16 @@ private actor FixtureProvider: LiveProvider {
         return RoomPage(rooms: rooms, hasMore: false)
     }
     func search(keyword: String, page: Int) async throws -> RoomPage { RoomPage(rooms: UIFixtures.rooms, hasMore: false) }
+    func categories() async throws -> [LiveCategoryGroup] {
+        [LiveCategoryGroup(id: "2", name: "网游", children: [
+            LiveCategory(platform: .bilibili, categoryID: "86", parentID: "2", name: "英雄联盟"),
+            LiveCategory(platform: .bilibili, categoryID: "240", parentID: "2", name: "单机游戏")
+        ]), LiveCategoryGroup(id: "3", name: "音乐", children: [
+            LiveCategory(platform: .bilibili, categoryID: "235", parentID: "3", name: "放松音乐")
+        ])]
+    }
+    func categoryRooms(category: LiveCategory, page: Int) async throws -> RoomPage {
+        RoomPage(rooms: [LiveRoom(platform: .bilibili, roomID: String(100 + page), title: "\(category.name) · 第\(page)页", streamer: "分区主播", isLive: true)], hasMore: page < 2)
+    }
 }
 #endif

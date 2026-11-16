@@ -7,6 +7,14 @@ final class BrowseModel {
     static let cacheLifetime: TimeInterval = 600
 
     var selectedPlatform: LivePlatform?
+    private var platformCategories: [LivePlatform: LiveCategory] = [:]
+    var selectedCategory: LiveCategory? {
+        get { selectedPlatform.flatMap { platformCategories[$0] } }
+        set {
+            guard let platform = selectedPlatform, newValue == nil || newValue?.platform == platform else { return }
+            platformCategories[platform] = newValue
+        }
+    }
     var keyword = ""
     private(set) var rooms: [LiveRoom] = []
     private(set) var issues: [PlatformIssue] = []
@@ -32,10 +40,11 @@ final class BrowseModel {
     }
 
     var hasMore: Bool { !morePlatforms.isEmpty }
-    var requestKey: String { "\(selectedPlatform?.id ?? "all"):\(keyword)" }
+    var requestKey: String { "\(selectedPlatform?.id ?? "all"):\(selectedCategory?.id ?? "recommendations"):\(keyword)" }
 
-    init(service: LiveService, now: @escaping () -> Date = Date.init) {
+    init(service: LiveService, platform: LivePlatform? = .bilibili, now: @escaping () -> Date = Date.init) {
         self.service = service
+        selectedPlatform = platform
         self.now = now
     }
 
@@ -77,7 +86,7 @@ final class BrowseModel {
         defer { if generation == token { isLoading = false } }
         do {
             let platforms = selectedPlatform.map { Set([$0]) } ?? Set(LivePlatform.allCases.filter { isSearch ? $0.supportsSearch : $0.supportsDiscovery })
-            let result = try await service.discover(platforms: platforms, keyword: isSearch ? keyword : "")
+            let result = try await service.discover(platforms: platforms, keyword: isSearch ? keyword : "", category: isSearch ? nil : selectedCategory)
             guard generation == token else { return }
             let failed = result.rooms.isEmpty && !result.issues.isEmpty
             if failed && !rooms.isEmpty {
@@ -105,7 +114,7 @@ final class BrowseModel {
         isLoadingMore = true
         defer { if generation == token { isLoadingMore = false } }
         do {
-            let result = try await service.discover(platforms: morePlatforms, page: page + 1, keyword: isSearch ? keyword : "")
+            let result = try await service.discover(platforms: morePlatforms, page: page + 1, keyword: isSearch ? keyword : "", category: isSearch ? nil : selectedCategory)
             guard generation == token else { return }
             var seen = Set(rooms.map(\.id))
             rooms.append(contentsOf: result.rooms.filter { seen.insert($0.id).inserted })
