@@ -34,6 +34,9 @@ enum FavoriteFilter: String, CaseIterable, Identifiable {
 
 @MainActor @Observable
 final class LibraryStore {
+    /// A saved live status older than this is requested again when the favorites page is shown or stays open.
+    static let statusLifetime: TimeInterval = 60
+
     private(set) var favorites: [LiveRoom] = []
     private(set) var history: [LiveRoom] = []
     private(set) var storageError: String?
@@ -43,9 +46,13 @@ final class LibraryStore {
         didSet { defaults.set(appearance.rawValue, forKey: "jlive.appearance") }
     }
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private var statusUpdatedAt: Date?
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init) {
         self.defaults = defaults
+        self.now = now
         appearance = AppAppearance(rawValue: defaults.string(forKey: "jlive.appearance") ?? "system") ?? .system
         favorites = load("jlive.favorites")
         history = load("jlive.history")
@@ -89,15 +96,31 @@ final class LibraryStore {
         persist(history, key: "jlive.history")
     }
 
+    /// Called when the favorites page is shown and while it stays open. Saved statuses are only
+    /// snapshots, so they are requested again once they are older than `statusLifetime`.
+    func refreshIfStale(using service: LiveService) async {
+        guard !favorites.isEmpty else { return }
+        if let statusUpdatedAt, now().timeIntervalSince(statusUpdatedAt) < Self.statusLifetime { return }
+        await refresh(using: service)
+    }
+
+    /// Requests the current state of every favorite. The requests run in a task of their own
+    /// so leaving the SwiftUI page does not cancel the remaining batches.
     func refresh(using service: LiveService) async {
-        guard !isRefreshing else { return }
+        if let refreshTask { return await refreshTask.value }
+        let task = Task { await updateStatuses(using: service) }
+        refreshTask = task
+        await task.value
+        refreshTask = nil
+    }
+
+    private func updateStatuses(using service: LiveService) async {
         isRefreshing = true
         defer { isRefreshing = false }
         let snapshot = favorites
         var failures = 0
         // Four requests at a time keeps large libraries from flooding the platforms.
         for start in stride(from: 0, to: snapshot.count, by: 4) {
-            guard !Task.isCancelled else { return }
             let batch = snapshot[start..<min(start + 4, snapshot.count)]
             let results = await withTaskGroup(of: (String, LiveRoom?).self) { group in
                 for room in batch { group.addTask { (room.id, try? await service.detail(room)) } }
@@ -105,7 +128,6 @@ final class LibraryStore {
                 for await result in group { results.append(result) }
                 return results
             }
-            guard !Task.isCancelled else { return }
             for (id, room) in results {
                 guard let room else { failures += 1; continue }
                 if let index = favorites.firstIndex(where: { $0.id == id }) { favorites[index] = room }
@@ -114,7 +136,14 @@ final class LibraryStore {
         var seen = Set<String>()
         favorites = favorites.filter { seen.insert($0.id).inserted }
         persist(favorites, key: "jlive.favorites")
-        refreshMessage = failures == 0 ? "开播状态已更新" : "已更新，\(failures) 个直播间暂时无法访问"
+        guard snapshot.isEmpty || failures < snapshot.count else {
+            // Nothing was learned, so the statuses still count as old and the next visit asks again.
+            refreshMessage = "暂时无法更新开播状态"
+            return
+        }
+        statusUpdatedAt = now()
+        let time = now().formatted(date: .omitted, time: .shortened)
+        refreshMessage = failures == 0 ? "开播状态更新于 \(time)" : "更新于 \(time)，\(failures) 个直播间暂时无法访问"
     }
 
     func backup() throws -> Data {
@@ -132,6 +161,8 @@ final class LibraryStore {
         var seen = Set(favorites.map(\.id))
         favorites.append(contentsOf: backup.favorites.filter { seen.insert($0.id).inserted })
         persist(favorites, key: "jlive.favorites")
+        // Imported statuses are as old as the backup.
+        statusUpdatedAt = nil
     }
 
     private func load(_ key: String) -> [LiveRoom] {

@@ -10,10 +10,27 @@ struct CategoryTests {
         #expect(groups[0].children.count == 2)
         #expect(groups[0].children[0].id != groups[1].children[0].id)
         #expect(groups[0].children[1].imageURL?.scheme == "https")
-        let rooms = try BilibiliProvider.parseCategoryRooms(json(#"{"has_more":0,"list":[{"roomid":1,"title":"游戏","uname":"主播"}]}"#))
-        #expect(rooms.rooms.first?.isLive == true)
-        #expect(!rooms.hasMore)
         #expect(throws: LiveError.self) { try BilibiliProvider.parseCategories(json("{}")) }
+    }
+
+    @Test func bilibiliCategoryRoomsStayInsideTheAreaAndPageByCount() throws {
+        let game = LiveCategory(platform: .bilibili, categoryID: "86", parentID: "2", name: "英雄联盟")
+        let everyGame = LiveCategory(platform: .bilibili, categoryID: "0", parentID: "2", name: "全部网游")
+        let data = try json(#"{"count":61,"list":[{"roomid":1,"title":"上分","uname":"甲","area_v2_id":86,"area_v2_parent_id":2,"area_name":"英雄联盟"},{"roomid":2,"title":"对局","uname":"乙","area_v2_id":329,"area_v2_parent_id":2,"area_name":"无畏契约"},{"roomid":3,"title":"唱歌","uname":"丙","area_v2_id":21,"area_v2_parent_id":1,"area_name":"视频唱见"}]}"#)
+        let page = try BilibiliProvider.parseCategoryRooms(data, category: game, page: 2)
+        #expect(page.rooms.map(\.roomID) == ["1"], "其他分区的直播间不能出现在所选分区里")
+        #expect(page.rooms.first?.category == "英雄联盟")
+        #expect(page.rooms.first?.isLive == true)
+        #expect(page.hasMore)
+        #expect(try !BilibiliProvider.parseCategoryRooms(data, category: game, page: 3).hasMore)
+        #expect(try BilibiliProvider.parseCategoryRooms(data, category: everyGame, page: 1).rooms.map(\.roomID) == ["1", "2"])
+        // A page past the end is empty even though the count is larger.
+        #expect(try !BilibiliProvider.parseCategoryRooms(json(#"{"count":175,"list":[]}"#), category: game, page: 2).hasMore)
+        // Without area fields or a count the rooms are kept, and a short page ends the list.
+        let plain = try BilibiliProvider.parseCategoryRooms(json(#"{"list":[{"roomid":1,"title":"游戏","uname":"主播"}]}"#), category: game, page: 1)
+        #expect(plain.rooms.count == 1)
+        #expect(!plain.hasMore)
+        #expect(throws: LiveError.self) { try BilibiliProvider.parseCategoryRooms(json("{}"), category: game, page: 1) }
     }
 
     @Test func huyaDecodesCompoundIDsAndOmitsHiddenCategories() throws {
@@ -65,10 +82,11 @@ struct CategoryTests {
         for (provider, category) in zip(providers, categories) { _ = try await provider.categoryRooms(category: category, page: 2) }
         let urls = await client.urls
         func query(_ url: URL, _ key: String) -> String? { URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == key }?.value }
-        let bili = try #require(urls.first { $0.path.hasSuffix("second/getListByArea") })
+        let bili = try #require(urls.first { $0.path == "/room/v3/area/getRoomList" })
         #expect(query(bili, "parent_area_id") == "2")
         #expect(query(bili, "area_id") == "86")
         #expect(query(bili, "page") == "2")
+        #expect(!urls.contains { $0.path.hasSuffix("second/getListByArea") }, "推荐列表接口不按分区过滤，不能用于分区")
         let huya = try #require(urls.first { $0.path == "/cache.php" })
         #expect(query(huya, "gameId") == "1")
         #expect(query(huya, "page") == "2")
@@ -91,24 +109,40 @@ struct CategoryTests {
         #expect(await provider.requests == 2)
     }
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["JLIVE_CATEGORY_LIVE_TESTS"] == "1"), .timeLimit(.minutes(2)))
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["JLIVE_CATEGORY_LIVE_TESTS"] == "1"), .timeLimit(.minutes(3)))
     func livePlatformCategoriesAndRoomLists() async throws {
         let service = LiveService.standard()
         for platform in LivePlatform.allCases {
             let groups = try await service.categories(platform: platform)
             #expect(!groups.isEmpty)
-            let category = try #require(groups.flatMap(\.children).first { $0.name.contains("英雄联盟") } ?? groups.flatMap(\.children).first)
-            let result = try await service.discover(platforms: [platform], category: category)
-            #expect(result.issues.isEmpty)
-            #expect(!result.rooms.isEmpty)
-            #expect(result.rooms.allSatisfy { $0.platform == platform })
-            print("\(platform.shortName)：\(groups.count) 个父分区，\(category.name)返回 \(result.rooms.count) 个直播间")
-            if !result.platformsWithMore.isEmpty {
-                let next = try await service.discover(platforms: [platform], page: 2, category: category)
-                #expect(next.issues.isEmpty)
-                #expect(!next.rooms.isEmpty)
-                print("\(platform.shortName)分区第二页：\(next.rooms.count) 个直播间")
+            let all = groups.flatMap(\.children)
+            let first = try #require(all.first { $0.name == "英雄联盟" } ?? all.first)
+            let second = try #require(all.first { $0.name == "王者荣耀" } ?? all.last)
+            let recommended = Set(try await service.discover(platforms: [platform]).rooms.map(\.id))
+            var lists: [Set<String>] = []
+            // A list that merely has rooms proves nothing: it must follow the selected category.
+            for category in [first, second] {
+                let result = try await service.discover(platforms: [platform], category: category)
+                #expect(result.issues.isEmpty)
+                #expect(!result.rooms.isEmpty)
+                #expect(result.rooms.allSatisfy { $0.platform == platform })
+                let ids = Set(result.rooms.map(\.id))
+                #expect(ids != recommended, "\(platform.shortName)的\(category.name)分区返回了推荐列表")
+                // Douyin does not name the category of a room; the other platforms must name the selected one.
+                let named = result.rooms.filter { !$0.category.isEmpty }
+                let matching = named.filter { $0.category == category.name }.count
+                #expect(named.isEmpty || matching * 2 > named.count, "\(platform.shortName)的\(category.name)分区里多数直播间属于其他分区")
+                print("\(platform.shortName) \(category.name)：\(result.rooms.count) 个直播间，\(matching)/\(named.count) 个标注为该分区，与推荐重合 \(ids.intersection(recommended).count) 个，例如「\(result.rooms[0].title.prefix(18))」")
+                lists.append(ids)
+                if !result.platformsWithMore.isEmpty {
+                    let next = try await service.discover(platforms: [platform], page: 2, category: category)
+                    #expect(next.issues.isEmpty)
+                    #expect(!next.rooms.isEmpty)
+                    #expect(Set(next.rooms.map(\.id)) != ids, "第二页不能重复第一页")
+                    print("\(platform.shortName) \(category.name)第二页：\(next.rooms.count) 个直播间")
+                }
             }
+            #expect(lists[0].isDisjoint(with: lists[1]), "\(platform.shortName)的两个分区返回了相同的直播间")
         }
     }
 

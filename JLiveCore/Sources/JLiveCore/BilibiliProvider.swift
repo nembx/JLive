@@ -95,19 +95,30 @@ public actor BilibiliProvider: LiveProvider {
         }
     }
 
+    static let categoryPageSize = 30
+
     public func categoryRooms(category: LiveCategory, page: Int) async throws -> RoomPage {
         guard category.platform == platform else { throw LiveError.invalidResponse }
-        let data = try await request("/xlive/web-interface/v1/second/getListByArea", query: [
-            "platform": "web", "parent_area_id": category.parentID, "area_id": category.categoryID,
-            "sort": "online", "page_size": "30", "page": String(max(1, page))
-        ], signed: true)
-        return try Self.parseCategoryRooms(data)
+        let page = max(1, page)
+        // `second/getList`, which the reference uses, refuses visitors with -352, and
+        // `second/getListByArea` ignores the area and answers with the recommendations.
+        // This older list needs no signature and is filtered by area.
+        let data = try await request("/room/v3/area/getRoomList", query: [
+            "platform": "web", "parent_area_id": category.parentID, "cate_id": "0", "area_id": category.categoryID,
+            "sort_type": "online", "page": String(page), "page_size": String(Self.categoryPageSize)
+        ])
+        return try Self.parseCategoryRooms(data, category: category, page: page)
     }
 
-    static func parseCategoryRooms(_ data: JSONValue) throws -> RoomPage {
-        let rooms = try data["list"].requiredArray().compactMap(Self.room)
-        let hasMore = data["has_more"].isNull ? !rooms.isEmpty : data["has_more"].int == 1
-        return RoomPage(rooms: rooms, hasMore: hasMore)
+    static func parseCategoryRooms(_ data: JSONValue, category: LiveCategory, page: Int) throws -> RoomPage {
+        let list = try data["list"].requiredArray()
+        // The "全部" entry of a parent area has ID 0 and lists every area under that parent.
+        let (key, expected) = category.categoryID == "0" ? ("area_v2_parent_id", category.parentID) : ("area_v2_id", category.categoryID)
+        // Rooms of other areas are left out, so a list that stops honouring the area cannot pass for the category.
+        let rooms = list.filter { $0[key].isNull || $0[key].string == expected }.compactMap(Self.room)
+        // `count` is the number of live rooms in the area.
+        let hasMore = data["count"].isNull ? list.count >= categoryPageSize : page * categoryPageSize < data["count"].int
+        return RoomPage(rooms: rooms, hasMore: !list.isEmpty && hasMore)
     }
 
     public func search(keyword: String, page: Int) async throws -> RoomPage {
