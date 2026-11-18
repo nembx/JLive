@@ -2,6 +2,74 @@ import XCTest
 
 @MainActor
 final class PlayerUITests: XCTestCase {
+    func testFullscreenVideoReachesBothVerticalEdges() throws {
+        try checkFullscreenVideoEdges(resource: "landscape")
+    }
+
+    func testUltrawideVideoAlsoFillsTheFullscreenHeight() throws {
+        try checkFullscreenVideoEdges(resource: "ultrawide")
+    }
+
+    private func checkFullscreenVideoEdges(resource: String) throws {
+        let app = XCUIApplication()
+        let videoURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: resource, withExtension: "mp4"))
+        app.launchArguments = ["--muted", "--ui-fixtures", "--fixture-video", videoURL.path, "--open-room", "https://live.bilibili.com/1"]
+        app.launch()
+        defer {
+            XCUIDevice.shared.orientation = .portrait
+            app.terminate()
+        }
+        let full = app.buttons["全屏播放"]
+        XCTAssertTrue(full.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["暂停"].waitForExistence(timeout: 5), "边界检查应使用真正播放的视频")
+        full.tap()
+        let exit = app.buttons["退出全屏"].firstMatch
+        XCTAssertTrue(exit.waitForExistence(timeout: 5))
+        for orientation in [UIDeviceOrientation.landscapeLeft, .landscapeRight] {
+            XCUIDevice.shared.orientation = orientation
+            let fillsHeight = NSPredicate { _, _ in
+                let video = app.otherElements["videoSurface"].frame
+                let window = app.windows.firstMatch.frame
+                return window.width > window.height && abs(video.minY - window.minY) < 1 && abs(video.maxY - window.maxY) < 1
+            }
+            let filled = expectation(for: fillsHeight, evaluatedWith: app)
+            wait(for: [filled], timeout: 5)
+            let video = app.otherElements["videoSurface"].frame
+            let window = app.windows.firstMatch.frame
+            XCTAssertEqual(video.minY, window.minY, accuracy: 1)
+            XCTAssertEqual(video.maxY, window.maxY, accuracy: 1)
+            let capture = XCUIScreen.main.screenshot()
+            try assertColoredVideoReachesVerticalEdges(capture)
+            let screenshot = XCTAttachment(screenshot: capture)
+            screenshot.name = "\(resource)-横屏画面边界-\(orientation.rawValue)"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+        if !exit.exists { app.otherElements["videoSurface"].tap() }
+        exit.tap()
+        XCTAssertTrue(full.waitForExistence(timeout: 5))
+    }
+
+    private func assertColoredVideoReachesVerticalEdges(_ screenshot: XCUIScreenshot) throws {
+        // Device screenshots retain portrait pixels with an orientation tag; draw it before sampling.
+        let source = screenshot.image
+        let size = CGSize(width: max(source.size.width, source.size.height), height: min(source.size.width, source.size.height))
+        let normalized = UIGraphicsImageRenderer(size: size).image { _ in source.draw(in: CGRect(origin: .zero, size: size)) }
+        let image = try XCTUnwrap(normalized.cgImage)
+        XCTAssertGreaterThan(image.width, image.height)
+        // The silent fixture has colored bands along both edges. Sample away from the rounded corners.
+        for y in [image.height / 100, image.height - image.height / 100] {
+            let sample = try XCTUnwrap(image.cropping(to: CGRect(x: image.width / 2, y: y, width: 1, height: 1)))
+            var pixel = [UInt8](repeating: 0, count: 4)
+            try pixel.withUnsafeMutableBytes { bytes in
+                let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                                     space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                context.draw(sample, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            }
+            XCTAssertGreaterThan(Int(pixel[0]) + Int(pixel[1]) + Int(pixel[2]), 60, "屏幕顶部和底部应显示视频，而不是黑色空隙")
+        }
+    }
+
     func testDouyinNativePlayerIsMutedAndOffersChatSettings() throws {
         guard let roomID = ProcessInfo.processInfo.environment["JLIVE_DOUYIN_UI_ROOM"] else {
             throw XCTSkip("设置 JLIVE_DOUYIN_UI_ROOM 验证正在直播的抖音房间")
@@ -244,6 +312,18 @@ final class PlayerUITests: XCTestCase {
         defer { app.terminate() }
         app.tabBars.buttons["我的"].tap()
         XCTAssertTrue(app.buttons["appearancePicker"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["平台接入"].exists)
+        let cellularQuality = app.buttons["cellularQualityPicker"]
+        let wifiQuality = app.buttons["wifiQualityPicker"]
+        if !cellularQuality.isHittable { app.swipeUp() }
+        XCTAssertTrue(cellularQuality.exists)
+        XCTAssertTrue(wifiQuality.exists)
+        cellularQuality.tap()
+        app.buttons["标清"].tap()
+        wifiQuality.tap()
+        app.buttons["蓝光"].tap()
+        XCTAssertTrue(cellularQuality.label.contains("标清"))
+        XCTAssertTrue(wifiQuality.label.contains("蓝光"))
         app.swipeUp()
         if !app.buttons["导入收藏"].isHittable { app.swipeUp() }
         XCTAssertTrue(app.buttons["导出收藏"].exists)

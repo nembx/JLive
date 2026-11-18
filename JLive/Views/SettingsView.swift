@@ -46,15 +46,19 @@ struct SettingsView: View {
                     }
                     .accessibilityIdentifier("appearancePicker")
                 }
-                Section("平台接入") {
-                    ForEach(LivePlatform.allCases) { platform in
-                        HStack {
-                            PlatformBadge(platform: platform)
-                            Spacer()
-                            Text(platform.supportsSearch ? "原生播放 / 弹幕 / 搜索" : "原生播放 / 弹幕 / 推荐")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
+                Section {
+                    Picker("蜂窝网络默认画质", selection: $library.cellularQuality) {
+                        ForEach(PlaybackQuality.allCases) { Text($0.name).tag($0) }
                     }
+                    .accessibilityIdentifier("cellularQualityPicker")
+                    Picker("Wi-Fi 默认画质", selection: $library.wifiQuality) {
+                        ForEach(PlaybackQuality.allCases) { Text($0.name).tag($0) }
+                    }
+                    .accessibilityIdentifier("wifiQualityPicker")
+                } header: {
+                    Text("默认画质")
+                } footer: {
+                    Text("打开直播时按当前网络选择画质。没有相同画质时，优先选择高一档，再选择低一档。")
                 }
                 Section("收藏备份") {
                     Button("导出收藏") {

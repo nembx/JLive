@@ -91,7 +91,9 @@ struct RoomDetailView: View {
             guard needsLoad else { return }
             needsLoad = false
             library.record(room)
-            await model.load()
+            let network = await PlaybackNetwork.current()
+            guard !Task.isCancelled else { needsLoad = true; return }
+            await model.load(preference: library.preferredQuality(for: network))
             guard !Task.isCancelled else {
                 needsLoad = true
                 return

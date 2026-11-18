@@ -187,7 +187,11 @@ private struct PlayerSurface: View {
         GeometryReader { geometry in
             ZStack {
                 Color.black
+                // Fit the height while preserving the stream's aspect ratio; the container clips extra width.
                 VideoLayerView(player: model.player, onLayer: onLayer)
+                    .frame(width: presentation.isFullScreen ? geometry.size.height * model.videoAspectRatio : geometry.size.width,
+                           height: geometry.size.height)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                 if !presentation.isInPictureInPicture { DanmakuOverlay(chat: chat) }
                 Color.clear.contentShape(Rectangle()).onTapGesture {
                     withAnimation(.easeOut(duration: 0.18)) {
@@ -204,7 +208,9 @@ private struct PlayerSurface: View {
                         .allowsHitTesting(false)
                 }
                 if let error = model.errorMessage { errorView(error) }
-                if showsControls, !showsSettings { controls }
+                if showsControls, !showsSettings {
+                    controls.padding(presentation.isFullScreen ? geometry.safeAreaInsets : EdgeInsets())
+                }
                 if showsSettings {
                     HStack {
                         Spacer(minLength: 0)
@@ -212,10 +218,12 @@ private struct PlayerSurface: View {
                             .frame(width: min(320, geometry.size.width - 24))
                             .padding(12)
                     }
+                    .padding(presentation.isFullScreen ? geometry.safeAreaInsets : EdgeInsets())
                 }
             }
             .clipped()
         }
+        .ignoresSafeArea(.container, edges: presentation.isFullScreen ? .all : [])
         .preferredColorScheme(.dark)
         .task(id: interaction) {
             guard !showsSettings else { return }

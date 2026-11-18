@@ -45,6 +45,12 @@ final class LibraryStore {
     var appearance: AppAppearance {
         didSet { defaults.set(appearance.rawValue, forKey: "jlive.appearance") }
     }
+    var cellularQuality: PlaybackQuality {
+        didSet { defaults.set(cellularQuality.rawValue, forKey: "jlive.cellularQuality") }
+    }
+    var wifiQuality: PlaybackQuality {
+        didSet { defaults.set(wifiQuality.rawValue, forKey: "jlive.wifiQuality") }
+    }
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private var statusUpdatedAt: Date?
@@ -54,8 +60,17 @@ final class LibraryStore {
         self.defaults = defaults
         self.now = now
         appearance = AppAppearance(rawValue: defaults.string(forKey: "jlive.appearance") ?? "system") ?? .system
+        cellularQuality = defaults.object(forKey: "jlive.cellularQuality").flatMap { $0 as? Int }.flatMap(PlaybackQuality.init(rawValue:)) ?? .high
+        wifiQuality = defaults.object(forKey: "jlive.wifiQuality").flatMap { $0 as? Int }.flatMap(PlaybackQuality.init(rawValue:)) ?? .original
         favorites = load("jlive.favorites")
         history = load("jlive.history")
+    }
+
+    func preferredQuality(for network: PlaybackNetwork) -> PlaybackQuality {
+        switch network {
+        case .cellular: cellularQuality
+        case .wifi: wifiQuality
+        }
     }
 
     func contains(_ room: LiveRoom) -> Bool { favorites.contains { $0.id == room.id } }

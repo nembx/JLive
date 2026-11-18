@@ -56,5 +56,13 @@ private actor FixtureProvider: LiveProvider {
         if room.id == UIFixtures.startedRoom.id { room.isLive = true }
         return room
     }
+    func playback(roomID: String, quality: Int?) async throws -> PlaybackInfo {
+        var lines: [StreamLine] = []
+        if let index = CommandLine.arguments.firstIndex(of: "--fixture-video"),
+           CommandLine.arguments.indices.contains(index + 1) {
+            lines = [StreamLine(url: URL(fileURLWithPath: CommandLine.arguments[index + 1]))]
+        }
+        return PlaybackInfo(lines: lines, qualities: [StreamQuality(id: 0, name: "原画")], currentQuality: 0, headers: [:])
+    }
 }
 #endif

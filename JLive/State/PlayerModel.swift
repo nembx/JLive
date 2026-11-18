@@ -15,6 +15,7 @@ final class PlayerModel {
     private(set) var selectedQuality: Int?
     private(set) var isPlaying = false
     private(set) var isBuffering = false
+    private(set) var videoAspectRatio = 16.0 / 9.0
     var isMuted: Bool {
         get { player.isMuted }
         set { player.isMuted = newValue; muteState = newValue }
@@ -26,6 +27,7 @@ final class PlayerModel {
     private var attemptedLines: Set<Int> = []
     @ObservationIgnored private let service: LiveService
     @ObservationIgnored private var statusObservation: NSKeyValueObservation?
+    @ObservationIgnored private var sizeObservation: NSKeyValueObservation?
     @ObservationIgnored private var failureObserver: NotificationLifetime?
     @ObservationIgnored private var timeObservation: NSKeyValueObservation?
     @ObservationIgnored private var timeout: Task<Void, Never>?
@@ -59,7 +61,8 @@ final class PlayerModel {
         muteState = player.isMuted
     }
 
-    func load(quality: Int? = nil) async {
+    func load(quality: Int? = nil, preference: PlaybackQuality? = nil) async {
+        let requestedQuality = quality ?? (preference == nil ? selectedQuality : nil)
         let shouldPlay = wantsPlayback
         stop()
         wantsPlayback = shouldPlay
@@ -82,8 +85,14 @@ final class PlayerModel {
             }
             try Task.checkCancellation()
             guard room.isLive != false else { throw LiveError.offline }
-            let info = try await service.playback(room, quality: quality)
-            guard generation == token else { return }
+            var info = try await service.playback(room, quality: requestedQuality)
+            guard generation == token, !Task.isCancelled else { return }
+            if requestedQuality == nil, let preference,
+               let preferred = preference.select(from: info.qualities), preferred.id != info.currentQuality {
+                // Keep the default playable stream if the platform cannot supply the preferred tier.
+                if let preferredInfo = try? await service.playback(room, quality: preferred.id) { info = preferredInfo }
+            }
+            guard generation == token, !Task.isCancelled else { return }
             playbackInfo = info
             selectedQuality = info.currentQuality
             selectedLine = 0
@@ -105,6 +114,7 @@ final class PlayerModel {
         guard let info = playbackInfo, info.lines.indices.contains(index) else { return }
         attemptedLines.insert(index)
         statusObservation?.invalidate()
+        sizeObservation?.invalidate()
         failureObserver = nil
         selectedLine = index
         errorMessage = nil
@@ -118,6 +128,13 @@ final class PlayerModel {
         ])
         let item = AVPlayerItem(asset: asset)
         item.preferredForwardBufferDuration = 3
+        sizeObservation = item.observe(\.presentationSize, options: [.initial, .new]) { [weak self] item, _ in
+            let size = item.presentationSize
+            Task { @MainActor [weak self] in
+                guard let self, self.generation == token, size.width > 0, size.height > 0 else { return }
+                self.videoAspectRatio = size.width / size.height
+            }
+        }
         statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
             let status = item.status
             Task { @MainActor [weak self] in
@@ -176,6 +193,8 @@ final class PlayerModel {
         generation = UUID()
         statusObservation?.invalidate()
         statusObservation = nil
+        sizeObservation?.invalidate()
+        sizeObservation = nil
         failureObserver = nil
         failureObserver = nil
         player.pause()

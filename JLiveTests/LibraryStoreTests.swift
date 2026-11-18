@@ -4,6 +4,20 @@ import JLiveCore
 
 @MainActor
 final class LibraryStoreTests: XCTestCase {
+    func testQualityPreferencesFollowTheNetworkAndPersistIndependently() {
+        let suite = "jlive-quality-tests-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = LibraryStore(defaults: defaults)
+        XCTAssertEqual(store.preferredQuality(for: .cellular), .high)
+        XCTAssertEqual(store.preferredQuality(for: .wifi), .original)
+        store.cellularQuality = .standard
+        store.wifiQuality = .blueRay
+        let restored = LibraryStore(defaults: defaults)
+        XCTAssertEqual(restored.preferredQuality(for: .cellular), .standard)
+        XCTAssertEqual(restored.preferredQuality(for: .wifi), .blueRay)
+    }
+
     func testBackupMergesWithoutRemovingOrDuplicatingFavorites() throws {
         let first = makeStore()
         let second = makeStore()
