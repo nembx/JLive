@@ -44,9 +44,11 @@ private struct DanmakuLabel: View {
             .task {
                 do {
                     if item.delay > 0 { try await Task.sleep(for: .seconds(item.delay)) }
-                    withAnimation(.linear(duration: item.duration)) { departed = true }
-                    try await Task.sleep(for: .seconds(item.duration))
-                    onFinish()
+                    withAnimation(.linear(duration: item.duration), completionCriteria: .removed) {
+                        departed = true
+                    } completion: {
+                        onFinish()
+                    }
                 } catch {}
             }
     }

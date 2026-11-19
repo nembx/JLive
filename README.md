@@ -1,89 +1,50 @@
 # JLive
 
-用 SwiftUI 编写的 iPhone 聚合直播应用，参考 [xiaoyaocz/dart_simple_live](https://github.com/xiaoyaocz/dart_simple_live)。
+简简单单，看你喜欢的直播。
 
-## 当前版本 · 0.7.2
+JLive 是一款 iPhone 聚合直播应用，把哔哩哔哩、虎牙、斗鱼和抖音放在一起，免登录浏览、观看和收藏。支持 iOS 17 及更新版本。
 
-- 免登录：JLive 不需要也不保存任何平台账号。
-- 发现：按 B站、虎牙、斗鱼、抖音浏览真实直播推荐，默认 B站，支持下拉刷新、分页。每个平台及分区的列表分别缓存 10 分钟，切换标签页、平台或从直播间返回时直接显示，保留已加载的分页；过期后或下拉时在原列表上更新，刷新失败保留原列表。
-- 分区：通过「浏览分区」打开当前平台的目录，按主分区排列子分区卡片，支持搜索主分区 / 子分区名称、下拉刷新和重试。四个平台均使用真实目录和分区直播接口，分区目录缓存一小时；切换平台记住各自的分区选择，点「推荐」回到推荐列表。B站官网现用的分区列表接口拒绝访客请求，JLive 使用按分区过滤、无需签名的旧列表接口，并丢弃不属于所选分区的直播间；这个接口有时只返回分区的一部分直播间，稍后下拉刷新即可。
-- 搜索：从发现页右上角放大镜进入，点取消、滑动列表、点空白处或提交后收起键盘。并行搜索 B站、虎牙、斗鱼，失败时保留其他平台结果。抖音的关键词搜索接口要求登录，所以抖音通过推荐、链接或房间号打开。
-- 直播间：四个平台原生 AVPlayer HLS 播放。播放器固定在页面顶部，画质、线路和弹幕设置都在播放器内；全屏按钮在右下角，进入横屏时沿用同一个视频层和连接，画面覆盖上下安全区，左右按视频比例留边，闲置后隐藏控件。下方信息和聊天列表只有内容超出显示区域时才允许回弹，聊天标题与消息区域增加上下留白。
-- 默认画质：在「我的」分别设置蜂窝网络和 Wi-Fi 打开直播时的画质，初始分别为高清和原画。按各平台的画质名称匹配，缺少同档时优先取最近的更高档，再取最近的更低档。播放器内手动切换后，重连沿用手动选择；偏好画质请求失败时使用平台默认的可播放线路。
-- 播放控制：播放 / 暂停、静音、手动画中画、连接超时自动换线、错误重试。进入后台时暂停普通播放；开启画中画后继续播放，回到前台恢复用户先前的播放状态。
-- 弹幕：四个平台实时弹幕与聊天列表。抖音使用访客连接，支持压缩消息、确认回复、心跳和备用服务器。支持开关、字号、不透明度、速度、显示区域和屏蔽词，设置在小窗和全屏之间共享并保存在本地；B站支持醒目留言和礼物。断线自动重连并轮换服务器。
-- 收藏：只提供正在开播、未开播两种筛选和数量，默认显示正在开播。首次打开收藏页时自动查询每个直播间的最新状态，再次进入时复用一分钟内的状态，过期后重新查询；页面停留期间每分钟再查一次，也可以下拉立即更新，并显示最近一次更新的时间。查询失败时保留原来的状态；状态未知的房间保留在未开播页，卡片标注「状态待更新」。支持链接添加、分享、JSON 导入导出，导入会验证房间号并合并去重，可通过 iCloud 云盘迁移备份。
-- 观看记录：移至「我的 → 最近观看」，保留最近打开的 50 个直播间，按最近时间排序、去重，可单独清空。
-- 外观：直播卡片统一 12 点内边距和间距、16:9 封面、两行标题占位，图标和卡片对齐；跟随系统、浅色和深色模式；新增 J + 播放标记图标，包含 iOS 18 及更新版本的深色和着色图标（iOS 17 使用默认图标）。
-- 快捷打开：支持 `jlive://bilibili/5050` 等链接，平台名为 `bilibili`、`huya`、`douyu` 或 `douyin`。
-- 抖音分享中的临时长房间号会解析为主播的网页房间号，方便长期收藏；各平台保留官网观看入口。
+[下载最新版](https://github.com/nembx/JLive/releases/latest)
 
-账号登录、发送弹幕、抖音关键词搜索、自动 iCloud 同步不提供。0.5.0 及更早版本保存过的 B站 / 抖音登录信息会在升级后首次启动时从钥匙串和网页数据中清除。抖音仅支持直播网页链接和数字房间号，暂不解析 `v.douyin.com` 短链接或整段分享文案。备份至 iCloud 云盘是手动文件备份，不是自动同步。公开接口可能受到平台风控或接口变更影响，无法访问时会显示错误并提供官网入口；画质列表仅展示实际可播放的 HLS 流。收藏中的热度与状态是最近一次更新获取的快照，打开收藏页时自动更新。
+## 软件截图
 
-## 运行
+<table>
+  <tr>
+    <th>发现直播</th>
+    <th>浏览分区</th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/discover.png" width="280" alt="发现页：切换直播平台，浏览推荐直播"></td>
+    <td><img src="docs/screenshots/categories.png" width="280" alt="分区页：浏览和搜索游戏、音乐等直播分区"></td>
+  </tr>
+  <tr>
+    <th>我的收藏</th>
+    <th>观看偏好</th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/favorites.png" width="280" alt="收藏页：查看正在开播和未开播的主播"></td>
+    <td><img src="docs/screenshots/settings.png" width="280" alt="我的页：最近观看、外观及蜂窝网络和 Wi-Fi 默认画质"></td>
+  </tr>
+</table>
 
-需要 Xcode 16 或更新版本，iOS 17 或更新版本。项目不依赖 Flutter，也没有外部 Swift 包依赖。
+截图来自 iPhone 模拟器，收藏页使用示例直播间展示开播筛选。
 
-1. 打开 `JLive.xcodeproj`，选择 `JLive` scheme。
-2. 选择 iPhone 模拟器后运行。
-3. 在真机上运行时，在 Signing & Capabilities 中选择自己的开发团队；必要时修改 Bundle Identifier。
+## 主要功能
 
-`project.yml` 是 XcodeGen 项目配置，修改项目结构后运行 `xcodegen generate` 重新生成工程。
+- **多平台浏览**：切换哔哩哔哩、虎牙、斗鱼和抖音，查看推荐直播，下拉刷新或加载更多。
+- **分区与搜索**：按游戏、音乐等分区寻找直播，支持搜索分区名称；可以搜索 B站、虎牙和斗鱼的直播间，抖音通过推荐、链接或房间号打开。
+- **直播播放**：支持画质与线路切换、播放与暂停、静音、画中画和 AirPlay。横屏画面上下贴边，切换全屏时继续播放。
+- **默认画质**：分别设置蜂窝网络和 Wi-Fi 打开直播时的画质，可选流畅、标清、高清、超清、蓝光和原画。缺少同档画质时，优先选择最近的更高档，再选择最近的更低档。
+- **实时弹幕**：四个平台均支持画面弹幕和聊天列表。已显示的弹幕完整走到左侧、全部移出画面后再消失；支持调整字号、不透明度、速度、显示区域和屏蔽词。
+- **收藏与开播状态**：收藏喜欢的直播间，按“正在开播”和“未开播”筛选。打开收藏页时自动更新开播状态，也可以下拉刷新。
+- **收藏备份**：导出或导入收藏文件，导入时合并去重，可通过 iCloud 云盘保存或迁移到另一台设备。
+- **最近观看**：在“我的”页查看最近打开的直播间，支持清空记录。
+- **外观与分享**：支持跟随系统、浅色和深色外观，以及直播间链接打开和分享。
 
-Debug 构建可以添加启动参数 `--open-room https://live.bilibili.com/5050`，直接打开直播间进行播放调试；再加上 `--muted` 可以静音播放。
+收藏、观看记录和偏好设置保存在本机。JLive 无需平台账号；直播暂时无法播放时，可通过直播间内的入口前往平台官网观看。
 
-```sh
-env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  swift test --package-path JLiveCore
+## 开源与致谢
 
-env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  xcodebuild -project JLive.xcodeproj -scheme JLive \
-  -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath /private/tmp/jlive-build CODE_SIGNING_ALLOWED=NO build
-```
+JLive 参考 [Simple Live](https://github.com/xiaoyaocz/dart_simple_live)，平台适配与弹幕协议参考并改写自该项目（Copyright © 2023–2025 xiaoyaocz）。
 
-核心测试默认使用固定数据，不联网。可设置 `JLIVE_LIVE_TESTS=1` 并添加 `--filter liveHLSAndChat`，验证虎牙 / 斗鱼的实际 HLS 清单和弹幕入房。设置 `JLIVE_DOUYIN_LIVE_TESTS=1` 并添加 `--filter liveDouyinDiscoveryPlaybackAndChat`，验证抖音推荐、HLS 清单和真实弹幕接收；两者都只读取数据，不播放音视频、不发送弹幕。
-
-设置 `JLIVE_CATEGORY_LIVE_TESTS=1` 并添加 `--filter livePlatformCategoriesAndRoomLists`，验证四个平台的实际分区目录，以及「英雄联盟」「王者荣耀」两个分区的直播列表和第二页。列表有内容并不够：测试要求分区列表不同于推荐列表、两个分区的直播间互不重复、第二页不重复第一页，并且在标注分区名称的平台（B站、虎牙、斗鱼）上多数直播间属于所选分区。测试只读取目录与房间信息。固定数据测试还覆盖主子分区关联、重复 ID、分页参数、B站列表按分区过滤和按总数分页，以及抖音当前 `__pace_f` 首页的大型内嵌数据解析。
-
-`JLiveTests` 验证收藏备份、无效导入、开播状态筛选、观看记录，以及发现页的列表缓存、过期、刷新时保留列表和刷新失败；也验证分区选择按平台保存、独立分页缓存，以及旧请求不能覆盖新选择。收藏的开播状态方面，验证显示页面时自动更新、一分钟内不重复请求、过期后重查、页面取消任务后仍更新全部收藏、同时发起的更新只请求一遍、全部失败后下次重试，以及导入后重新查询。`JLiveUITests` 验证搜索键盘收起 / 取消、发现页切换标签不重新请求与下拉刷新不空白、分区目录搜索 / 选择 / 分页 / 更换分区后列表随之更换 / 返回推荐、收藏页不用下拉就更新开播状态与两种筛选、观看记录入口 / 清空、主题切换、全屏进出与弹幕设置保留。新增导航测试使用 `--ui-fixtures`（仅 Debug 可用），数据与用户收藏隔离，不播放直播。通过 Xcode 的 Test，或 `xcodebuild test -project JLive.xcodeproj -scheme JLive -destination 'platform=iOS Simulator,name=<本机模拟器名称>'` 运行。界面测试自动使用 `--muted` 并在结束时关闭应用。
-
-抖音访客搜索的实际接口返回 `2483`（请先登录），所以应用内的搜索不包含抖音。核心包里保留了搜索响应解析、游标分页和 B站发送弹幕的请求构造及其测试，应用没有使用它们；设置 `JLIVE_DOUYIN_SEARCH_TESTS=1` 可验证抖音访客搜索目前仍要求登录。
-
-抖音实际播放界面测试默认跳过，运行 `xcodebuild test` 时设置 `TEST_RUNNER_JLIVE_DOUYIN_UI_ROOM=<正在直播的网页房间号>` 可启用；它会确认实际播放、静音、弹幕连接和播放器内设置，随后关闭直播间和应用。
-
-图标源绘制脚本为 `scripts/generate-icons.swift`，在仓库根目录运行 `swift scripts/generate-icons.swift` 可重新生成默认、深色、着色图标及应用内标记。
-
-## 自动编译与发布
-
-`.github/workflows/build.yml` 在每次推送到 `main` 时运行：
-
-1. 运行核心测试，编译未签名的 `JLive-<版本号>.ipa`，并挂在这次运行的 Artifacts 里。
-2. 如果 `project.yml` 里的 `MARKETING_VERSION` 还没有对应的 `v<版本号>` 标签，就创建 GitHub Release 并附上 IPA。
-
-所以发版只需要改 `project.yml` 里的版本号、运行 `xcodegen generate`，然后提交并推送。更新日志取自上一个版本以来的提交标题，提交信息请用中文，写成读者能看懂的一句话。只改文档的推送不会触发编译。
-
-IPA 没有签名，需要用 AltStore、SideStore、Sideloadly 或 TrollStore 等工具自行签名后安装。
-
-## 结构
-
-```text
-JLive/                  SwiftUI 页面、浏览状态、播放与弹幕生命周期、本地记录
-JLiveCore/              平台无关的 Swift Package
-  Sources/JLiveCore/    数据模型、HTTP 客户端、平台适配器、聚合服务、WBI 签名、弹幕协议与连接
-  Tests/               签名、平台映射、聚合部分失败、直播链接、HLS 解析、弹幕编解码与重连测试
-JLiveTests/             收藏存储与备份测试
-JLiveUITests/           主题与播放器交互测试
-scripts/               图标绘制源代码
-.github/workflows/      自动测试、编译 IPA 与发布
-project.yml             XcodeGen 配置，版本号在这里
-JLive.xcodeproj/         可直接打开的 Xcode 工程
-```
-
-增加平台时实现 `LiveProvider` 并注册到 `LiveService`；要支持弹幕，再实现 `chat(roomID:)` 返回一个 `LiveChatEndpoint`，连接、心跳和重连由 `LiveChatClient` 负责。界面不需要知道各平台的接口字段与签名规则。
-
-## 参考与许可
-
-平台接口、字段映射、WBI / 抖音签名流程和弹幕协议参考并改写自 `dart_simple_live` 的 `simple_live_core`，参考版本为 `ba828e6783b176ea5709fcd09f0eb01dfaceeb51`，原作者 Copyright © 2023–2025 xiaoyaocz。JLive 使用独立的 SwiftUI 界面和 Swift 实现；抖音签名 JavaScript 保留在 `JLiveCore/Sources/JLiveCore/Resources`，由 JavaScriptCore 执行。
-
-本项目按 **GPL-3.0-or-later** 分发，完整条款见 [LICENSE](LICENSE)。应用内「我的 → 开源许可」保留来源说明与许可证。
+本项目按 [GPL-3.0-or-later](LICENSE) 开源，应用内也可查看开源许可。

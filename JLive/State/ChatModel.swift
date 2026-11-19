@@ -64,6 +64,7 @@ final class ChatModel {
     @ObservationIgnored private let service: LiveService
     @ObservationIgnored private let client: LiveChatClient
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private var session: Task<Void, Never>?
     @ObservationIgnored private var flush: Task<Void, Never>?
     @ObservationIgnored private var pending: [LiveChatMessage] = []
@@ -72,10 +73,11 @@ final class ChatModel {
     @ObservationIgnored private var room: LiveRoom?
     @ObservationIgnored private var generation = UUID()
 
-    init(service: LiveService, client: LiveChatClient = LiveChatClient(), defaults: UserDefaults = .standard) {
+    init(service: LiveService, client: LiveChatClient = LiveChatClient(), defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init) {
         self.service = service
         self.client = client
         self.defaults = defaults
+        self.now = now
         showsFloating = defaults.object(forKey: Self.floatingKey) as? Bool ?? true
         fontSize = min(24, max(12, defaults.object(forKey: "jlive.danmaku.size") as? Double ?? 15))
         opacity = min(1, max(0.25, defaults.object(forKey: "jlive.danmaku.opacity") as? Double ?? 0.9))
@@ -136,10 +138,9 @@ final class ChatModel {
 
     private func finish(with message: String) {
         status = .failed(message)
-        floating.removeAll()
     }
 
-    private func handle(_ event: LiveChatEvent) {
+    func handle(_ event: LiveChatEvent) {
         switch event {
         case .connected: status = .connected
         case .reconnecting: status = .reconnecting
@@ -177,7 +178,8 @@ final class ChatModel {
     }
 
     private func appendFloating(_ message: LiveChatMessage, id: Int) {
-        guard showsFloating, viewport.width > 0 else { return }
+        // Skip new arrivals at capacity; every admitted message keeps its place until it exits.
+        guard showsFloating, viewport.width > 0, floating.count < Self.maxFloating else { return }
         var isSuperChat = false
         switch message.kind {
         case .chat: break
@@ -190,7 +192,7 @@ final class ChatModel {
         } else if laneFree.count < laneCount {
             laneFree.append(contentsOf: repeatElement(.distantPast, count: laneCount - laneFree.count))
         }
-        let now = Date()
+        let now = now()
         // Every message moves at the same speed, so a lane is free once the previous one fits in.
         guard let lane = laneFree.indices.first(where: { laneFree[$0] <= now }) else { return }
         let width = measure(message.text) + (isSuperChat ? 20 : 0)
@@ -199,9 +201,8 @@ final class ChatModel {
         laneFree[lane] = now.addingTimeInterval(delay + Double((width + 26) / speed))
         floating.append(Floating(
             id: id, text: message.text, color: message.color, isSuperChat: isSuperChat, lane: lane,
-            width: width, duration: Double((viewport.width + width) / speed), delay: delay, fontSize: CGFloat(fontSize)
+            width: width, duration: Double((viewport.width + width + 12) / speed), delay: delay, fontSize: CGFloat(fontSize)
         ))
-        if floating.count > Self.maxFloating { floating.removeFirst(floating.count - Self.maxFloating) }
     }
 
     private func measure(_ text: String) -> CGFloat {
