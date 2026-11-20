@@ -62,6 +62,11 @@ private actor FixtureProvider: LiveProvider {
            CommandLine.arguments.indices.contains(index + 1) {
             lines = [StreamLine(url: URL(fileURLWithPath: CommandLine.arguments[index + 1]))]
         }
+        if CommandLine.arguments.contains("--fixture-quality-switch") {
+            if quality != nil { try await Task.sleep(for: .milliseconds(800)) }
+            let actual = CommandLine.arguments.contains("--fixture-quality-fallback") ? 250 : (quality ?? 250)
+            return PlaybackInfo(lines: lines, qualities: [StreamQuality(id: 10000, name: "原画"), StreamQuality(id: 400, name: "蓝光"), StreamQuality(id: 250, name: "超清")], currentQuality: actual, headers: [:])
+        }
         return PlaybackInfo(lines: lines, qualities: [StreamQuality(id: 0, name: "原画")], currentQuality: 0, headers: [:])
     }
 }

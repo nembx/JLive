@@ -13,6 +13,12 @@ final class PlayerModel {
     private(set) var errorMessage: String?
     private(set) var selectedLine = 0
     private(set) var selectedQuality: Int?
+    private(set) var qualitySwitchMessage: String?
+    private(set) var pendingQuality: Int?
+    var qualityLabel: String {
+        if isResolving, pendingQuality != nil { return "切换中…" }
+        return playbackInfo?.qualities.first { $0.id == selectedQuality }?.name ?? "画质"
+    }
     private(set) var isPlaying = false
     private(set) var isBuffering = false
     private(set) var videoAspectRatio = 16.0 / 9.0
@@ -63,15 +69,17 @@ final class PlayerModel {
 
     func load(quality: Int? = nil, preference: PlaybackQuality? = nil) async {
         let requestedQuality = quality ?? (preference == nil ? selectedQuality : nil)
+        let requestedName = playbackInfo?.qualities.first { $0.id == quality }?.name
         let shouldPlay = wantsPlayback
         stop()
         wantsPlayback = shouldPlay
         let token = generation
         errorMessage = nil
-        playbackInfo = nil
+        qualitySwitchMessage = nil
+        pendingQuality = quality
         guard room.platform.supportsNativePlayback else { return }
         isResolving = true
-        defer { if generation == token { isResolving = false } }
+        defer { if generation == token { isResolving = false; pendingQuality = nil } }
         do {
             await Task.detached(priority: .userInitiated) {
                 try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
@@ -95,6 +103,16 @@ final class PlayerModel {
             guard generation == token, !Task.isCancelled else { return }
             playbackInfo = info
             selectedQuality = info.currentQuality
+            pendingQuality = nil
+            if let quality {
+                let actualName = info.qualities.first { $0.id == info.currentQuality }?.name ?? "平台默认画质"
+                if quality == info.currentQuality {
+                    qualitySwitchMessage = "已切换至\(actualName)"
+                } else {
+                    let name = requestedName ?? info.qualities.first { $0.id == quality }?.name ?? "所选画质"
+                    qualitySwitchMessage = "\(name)暂不可用，当前为\(actualName)"
+                }
+            }
             selectedLine = 0
             isResolving = false
             playLine(0)
@@ -201,6 +219,7 @@ final class PlayerModel {
         player.replaceCurrentItem(with: nil)
         isPreparing = false
         isResolving = false
+        pendingQuality = nil
     }
 
 }

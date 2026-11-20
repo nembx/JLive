@@ -161,39 +161,41 @@ public actor BilibiliProvider: LiveProvider {
             "platform": "html5", "qn": String(quality ?? 10_000)
         ])
         guard data["live_status"].int == 1 else { throw LiveError.offline }
-        return try Self.parsePlayback(data, headers: ["Referer": "https://live.bilibili.com/", "User-Agent": HTTPClient.userAgent])
+        return try Self.parsePlayback(data, headers: ["Referer": "https://live.bilibili.com/", "User-Agent": HTTPClient.userAgent], requestedQuality: quality)
     }
 
-    public static func parsePlayback(_ data: JSONValue, headers: [String: String]) throws -> PlaybackInfo {
+    public static func parsePlayback(_ data: JSONValue, headers: [String: String], requestedQuality: Int? = nil) throws -> PlaybackInfo {
         let playurl = data["playurl_info"]["playurl"]
-        var candidates: [(line: StreamLine, priority: Int)] = []
-        var accepted: Set<Int> = []
-        var currentQuality = 0
+        var candidates: [(line: StreamLine, priority: Int, quality: Int, accepted: [Int])] = []
         for stream in playurl["stream"].array where stream["protocol_name"].string == "http_hls" {
             for format in stream["format"].array {
                 for codec in format["codec"].array where codec["codec_name"].string == "avc" {
                     let path = codec["base_url"].string
                     guard !path.isEmpty else { continue }
-                    currentQuality = codec["current_qn"].int
-                    accepted.formUnion(codec["accept_qn"].array.map(\.int))
+                    let currentQuality = codec["current_qn"].int
+                    let accepted = codec["accept_qn"].array.map(\.int)
                     for host in codec["url_info"].array {
                         guard let url = URL(string: host["host"].string + path + host["extra"].string),
                               ["https", "http"].contains(url.scheme ?? ""), url.host != nil else { continue }
-                        if !candidates.contains(where: { $0.line.url == url }) {
+                        if !candidates.contains(where: { $0.line.url == url && $0.quality == currentQuality }) {
                             let priority = (format["format_name"].string == "fmp4" ? 0 : 2) + (url.host?.contains("mcdn") == true ? 1 : 0)
-                            candidates.append((StreamLine(url: url), priority))
+                            candidates.append((StreamLine(url: url), priority, currentQuality, accepted))
                         }
                     }
                 }
             }
         }
-        guard !candidates.isEmpty else { throw LiveError.noPlayableStream }
+        let ordered = candidates.sorted { $0.priority < $1.priority }
+        guard let selected = ordered.first(where: { $0.quality == requestedQuality }) ?? ordered.first else { throw LiveError.noPlayableStream }
         // Prefer fMP4 HLS on iOS; some TS hosts reject otherwise valid guest requests.
-        let lines = candidates.sorted { $0.priority < $1.priority }.map(\.line)
+        // All fallback lines must keep the same quality as the first stream and its displayed label.
+        let matching = ordered.filter { $0.quality == selected.quality }
+        let lines = matching.map(\.line)
+        let accepted = Set(matching.flatMap(\.accepted)).union([selected.quality])
         let qualities = playurl["g_qn_desc"].array.filter { accepted.contains($0["qn"].int) }
             .map { StreamQuality(id: $0["qn"].int, name: $0["desc"].string) }
             .sorted { $0.id > $1.id }
-        return PlaybackInfo(lines: lines, qualities: qualities, currentQuality: currentQuality, headers: headers)
+        return PlaybackInfo(lines: lines, qualities: qualities, currentQuality: selected.quality, headers: headers)
     }
 
     public func chat(roomID: String) async throws -> LiveChatEndpoint {

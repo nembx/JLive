@@ -9,6 +9,18 @@ enum JLiveLayout {
     static let gridSpacing: CGFloat = 12
 }
 
+/// Use available window space so folding, rotation and resizing retain the same player view.
+struct RoomViewingLayout {
+    let isSideBySide: Bool
+    let videoSize: CGSize
+
+    init(size: CGSize) {
+        isSideBySide = size.width >= 700 && size.width > size.height
+        let width = isSideBySide ? size.width - min(340, size.width * 0.36) : size.width
+        videoSize = CGSize(width: width, height: min(width * 9 / 16, size.height * (isSideBySide ? 1 : 0.55)))
+    }
+}
+
 struct CircleIconButton: View {
     let symbol: String
     let label: String

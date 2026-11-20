@@ -22,64 +22,16 @@ struct RoomDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            playerArea
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    HStack(spacing: 8) {
-                        PlatformBadge(platform: model.room.platform)
-                        if model.room.isLive == true {
-                            Label("正在直播", systemImage: "dot.radiowaves.left.and.right")
-                                .font(.caption).foregroundStyle(JLiveTheme.accent)
-                        } else if model.room.isLive == false {
-                            Text("未开播").font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text("房间 \(model.room.roomID)").font(.caption.monospaced()).foregroundStyle(.secondary)
-                    }
-                    Text(model.room.title).font(.title3.bold()).textSelection(.enabled)
-                    HStack(spacing: 12) {
-                        AsyncImage(url: model.room.avatarURL) { image in image.resizable().scaledToFill() } placeholder: {
-                            Image(systemName: "person.crop.circle.fill").resizable().foregroundStyle(.tertiary)
-                        }
-                        .frame(width: 42, height: 42).clipShape(Circle())
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(model.room.streamer).font(.subheadline.weight(.semibold))
-                            Text(model.room.category.isEmpty ? "\(model.room.popularity) 热度" : "\(model.room.category) · \(model.room.popularity) 热度")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button { library.toggle(model.room) } label: {
-                            Image(systemName: library.contains(model.room) ? "heart.fill" : "heart")
-                                .font(.title3).frame(width: 44, height: 44)
-                                .background(JLiveTheme.surface, in: Circle())
-                        }
-                        .accessibilityLabel(library.contains(model.room) ? "取消收藏" : "收藏直播间")
-                    }
-                    if model.room.platform.supportsChat { ChatPanel(chat: chat) }
-                    if !model.room.platform.supportsNativePlayback {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Label("前往平台观看", systemImage: "safari").font(.headline)
-                            Text("这个平台目前通过官网观看，直播间可以收藏在 JLive 中。")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                            Button { showingWebsite = true } label: { Label("打开直播间", systemImage: "arrow.up.right") }
-                                .buttonStyle(.borderedProminent)
-                        }
-                        .padding(18).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(JLiveTheme.surface, in: RoundedRectangle(cornerRadius: 16))
-                    }
-                    HStack {
-                        Button { showingWebsite = true } label: { Label("平台网页", systemImage: "safari") }
-                        Spacer()
-                        ShareLink(item: model.room.webURL) { Label("分享", systemImage: "square.and.arrow.up") }
-                    }
-                    .font(.subheadline).padding(.top, 4)
-                }
-                .padding(20)
-                .padding(.bottom, 12)
+        GeometryReader { geometry in
+            let layout = RoomViewingLayout(size: geometry.size)
+            let arrangement = layout.isSideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+            arrangement {
+                playerArea
+                    .frame(width: layout.videoSize.width, height: layout.videoSize.height)
+                roomInformation
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .accessibilityIdentifier("roomInformation")
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
         }
         .background(JLiveTheme.background)
         .navigationTitle(model.room.platform.name).navigationBarTitleDisplayMode(.inline)
@@ -112,6 +64,65 @@ struct RoomDetailView: View {
             if phase == .background, !presentation.isInPictureInPicture { model.suspend() }
             if phase == .active { model.resume() }
         }
+    }
+
+    private var roomInformation: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 8) {
+                    PlatformBadge(platform: model.room.platform)
+                    if model.room.isLive == true {
+                        Label("正在直播", systemImage: "dot.radiowaves.left.and.right")
+                            .font(.caption).foregroundStyle(JLiveTheme.accent)
+                    } else if model.room.isLive == false {
+                        Text("未开播").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text("房间 \(model.room.roomID)").font(.caption.monospaced()).foregroundStyle(.secondary)
+                }
+                Text(model.room.title).font(.title3.bold()).textSelection(.enabled)
+                HStack(spacing: 12) {
+                    AsyncImage(url: model.room.avatarURL) { image in image.resizable().scaledToFill() } placeholder: {
+                        Image(systemName: "person.crop.circle.fill").resizable().foregroundStyle(.tertiary)
+                    }
+                    .frame(width: 42, height: 42).clipShape(Circle())
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(model.room.streamer).font(.subheadline.weight(.semibold))
+                        Text(model.room.category.isEmpty ? "\(model.room.popularity) 热度" : "\(model.room.category) · \(model.room.popularity) 热度")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button { library.toggle(model.room) } label: {
+                        Image(systemName: library.contains(model.room) ? "heart.fill" : "heart")
+                            .font(.title3).frame(width: 44, height: 44)
+                            .background(JLiveTheme.surface, in: Circle())
+                    }
+                    .accessibilityLabel(library.contains(model.room) ? "取消收藏" : "收藏直播间")
+                }
+                if model.room.platform.supportsChat { ChatPanel(chat: chat) }
+                if !model.room.platform.supportsNativePlayback {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("前往平台观看", systemImage: "safari").font(.headline)
+                        Text("这个平台目前通过官网观看，直播间可以收藏在 JLive 中。")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        Button { showingWebsite = true } label: { Label("打开直播间", systemImage: "arrow.up.right") }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(JLiveTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+                }
+                HStack {
+                    Button { showingWebsite = true } label: { Label("平台网页", systemImage: "safari") }
+                    Spacer()
+                    ShareLink(item: model.room.webURL) { Label("分享", systemImage: "square.and.arrow.up") }
+                }
+                .font(.subheadline).padding(.top, 4)
+            }
+            .padding(20)
+            .padding(.bottom, 12)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .accessibilityIdentifier("roomInformation")
     }
 
     private var playerArea: some View {

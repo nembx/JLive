@@ -91,6 +91,26 @@ struct CoreTests {
         #expect(result.lines.count == 2)
     }
 
+    @Test func currentQualityMatchesThePreferredStreamAndFallbackLines() throws {
+        let data = try json("""
+        {"playurl_info":{"playurl":{
+          "g_qn_desc":[{"qn":10000,"desc":"原画"},{"qn":400,"desc":"蓝光"},{"qn":250,"desc":"超清"}],
+          "stream":[{"protocol_name":"http_hls","format":[
+            {"format_name":"fmp4","codec":[{"codec_name":"avc","current_qn":10000,"accept_qn":[10000,400,250],"base_url":"/original.m3u8","url_info":[{"host":"https://fmp4.example.com","extra":""}]}]},
+            {"format_name":"ts","codec":[{"codec_name":"avc","current_qn":250,"accept_qn":[250],"base_url":"/ultra.m3u8","url_info":[{"host":"https://ts.example.com","extra":""}]}]}
+          ]}]
+        }}}
+        """)
+        let info = try BilibiliProvider.parsePlayback(data, headers: [:])
+        #expect(info.lines.first?.url.path == "/original.m3u8")
+        #expect(info.currentQuality == 10000, "标签必须对应实际选择的首条播放线路")
+        #expect(info.lines.allSatisfy { $0.url.path == "/original.m3u8" }, "备用线路也必须保持同一画质")
+        let requested = try BilibiliProvider.parsePlayback(data, headers: [:], requestedQuality: 250)
+        #expect(requested.currentQuality == 250, "存在请求画质的格式时应选择对应流")
+        #expect(requested.lines.map(\.url.path) == ["/ultra.m3u8"])
+        #expect(requested.qualities.map(\.id) == [250])
+    }
+
     @Test func douyuListExcludesPromotionsAndMapsNumericID() async throws {
         let client = StubClient(response: try json("""
         {"error":0,"data":{"pgcnt":3,"rl":[

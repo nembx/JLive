@@ -2,6 +2,67 @@ import XCTest
 
 @MainActor
 final class PlayerUITests: XCTestCase {
+    func testFullscreenReturnsToThePreviousLandscapeLayout() throws {
+        let app = try launchQualityFixture(fallsBack: false)
+        defer { XCUIDevice.shared.orientation = .portrait; app.terminate() }
+        XCTAssertTrue(app.buttons["全屏播放"].waitForExistence(timeout: 8))
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let landscape = NSPredicate { _, _ in app.windows.firstMatch.frame.width > app.windows.firstMatch.frame.height }
+        wait(for: [expectation(for: landscape, evaluatedWith: app)], timeout: 5)
+        if !app.buttons["全屏播放"].exists { app.otherElements["videoSurface"].tap() }
+        app.buttons["全屏播放"].tap()
+        let exit = app.buttons["退出全屏"].firstMatch
+        XCTAssertTrue(exit.waitForExistence(timeout: 5))
+        exit.tap()
+        XCTAssertTrue(app.buttons["全屏播放"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.scrollViews["roomInformation"].exists)
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(window.width, window.height, "退出全屏应恢复原来的横屏，而不是强制竖屏")
+    }
+
+    func testQualityMenuUpdatesToTheConfirmedQuality() throws {
+        let app = try launchQualityFixture(fallsBack: false)
+        defer { app.terminate() }
+        let quality = app.buttons["切换清晰度"]
+        XCTAssertTrue(quality.waitForExistence(timeout: 8))
+        quality.tap()
+        app.buttons["蓝光"].tap()
+        wait(for: [expectation(for: NSPredicate(format: "value == %@", "蓝光"), evaluatedWith: quality)], timeout: 8)
+        XCTAssertTrue(app.staticTexts["已切换至蓝光"].exists)
+        app.buttons["播放器设置"].tap()
+        let picker = app.buttons["playerQualityPicker"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 3))
+        XCTAssertEqual(picker.value as? String, "蓝光")
+        picker.tap()
+        app.buttons["超清"].tap()
+        wait(for: [expectation(for: NSPredicate(format: "value == %@", "超清"), evaluatedWith: picker)], timeout: 8)
+        app.buttons["关闭设置"].tap()
+        XCTAssertEqual(quality.value as? String, "超清", "设置面板和播放器标签应同步")
+    }
+
+    func testUnavailableQualityKeepsActualLabelAndExplainsFallback() throws {
+        let app = try launchQualityFixture(fallsBack: true)
+        defer { app.terminate() }
+        let quality = app.buttons["切换清晰度"]
+        XCTAssertTrue(quality.waitForExistence(timeout: 8))
+        XCTAssertEqual(quality.value as? String, "超清")
+        quality.tap()
+        app.buttons["原画"].tap()
+        XCTAssertTrue(app.staticTexts["原画暂不可用，当前为超清"].waitForExistence(timeout: 8))
+        XCTAssertEqual(quality.value as? String, "超清")
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "画质回退反馈"; screenshot.lifetime = .keepAlways; add(screenshot)
+    }
+
+    private func launchQualityFixture(fallsBack: Bool) throws -> XCUIApplication {
+        let app = XCUIApplication()
+        let video = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "landscape", withExtension: "mp4"))
+        app.launchArguments = ["--muted", "--ui-fixtures", "--fixture-quality-switch", "--fixture-video", video.path, "--open-room", "https://live.bilibili.com/1"]
+        if fallsBack { app.launchArguments.append("--fixture-quality-fallback") }
+        app.launch()
+        return app
+    }
+
     func testFullscreenVideoReachesBothVerticalEdges() throws {
         try checkFullscreenVideoEdges(resource: "landscape")
     }

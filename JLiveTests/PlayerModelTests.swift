@@ -4,6 +4,48 @@ import JLiveCore
 
 @MainActor
 final class PlayerModelTests: XCTestCase {
+    func testUnavailableManualQualityExplainsTheActualQuality() async {
+        let provider = QualityProvider(returnsDefault: true)
+        let model = makeModel(provider)
+        await model.load()
+        await model.load(quality: 100)
+        XCTAssertEqual(model.selectedQuality, 0, "应保留平台确认的实际画质")
+        XCTAssertEqual(model.qualitySwitchMessage, "高清暂不可用，当前为原画")
+        XCTAssertNil(model.errorMessage)
+        model.stop()
+    }
+
+    func testSwitchingShowsPendingLabelUntilThePlatformResponds() async {
+        let provider = QualityProvider(holdsPreferred: true)
+        let model = makeModel(provider)
+        await model.load()
+        XCTAssertEqual(model.qualityLabel, "原画")
+        let switching = Task { await model.load(quality: 100) }
+        while await !provider.isWaiting { await Task.yield() }
+        XCTAssertEqual(model.qualityLabel, "切换中…")
+        XCTAssertEqual(model.pendingQuality, 100)
+        XCTAssertNotNil(model.playbackInfo, "切换期间保留画质菜单")
+        XCTAssertNil(model.qualitySwitchMessage)
+        await provider.release()
+        await switching.value
+        XCTAssertEqual(model.qualityLabel, "高清")
+        XCTAssertEqual(model.qualitySwitchMessage, "已切换至高清")
+        XCTAssertNil(model.pendingQuality)
+        model.stop()
+    }
+
+    func testFailedSwitchDoesNotReportSuccessOrKeepThePendingLabel() async {
+        let provider = QualityProvider(failsPreferred: true)
+        let model = makeModel(provider)
+        await model.load()
+        await model.load(quality: 100)
+        XCTAssertNil(model.qualitySwitchMessage)
+        XCTAssertNil(model.pendingQuality)
+        XCTAssertEqual(model.selectedQuality, 0)
+        XCTAssertNotNil(model.errorMessage)
+        model.stop()
+    }
+
     func testOpeningRequestsThePreferredPlatformQuality() async {
         let provider = QualityProvider()
         let model = makeModel(provider)
@@ -69,12 +111,14 @@ private actor QualityProvider: LiveProvider {
     var requests: [Int?] = []
     private let failsPreferred: Bool
     private let holdsPreferred: Bool
+    private let returnsDefault: Bool
     private var gate: CheckedContinuation<Void, Never>?
     var isWaiting: Bool { gate != nil }
 
-    init(failsPreferred: Bool = false, holdsPreferred: Bool = false) {
+    init(failsPreferred: Bool = false, holdsPreferred: Bool = false, returnsDefault: Bool = false) {
         self.failsPreferred = failsPreferred
         self.holdsPreferred = holdsPreferred
+        self.returnsDefault = returnsDefault
     }
 
     func release() { gate?.resume(); gate = nil }
@@ -86,6 +130,6 @@ private actor QualityProvider: LiveProvider {
             if holdsPreferred { await withCheckedContinuation { gate = $0 } }
             if failsPreferred { throw LiveError.noPlayableStream }
         }
-        return PlaybackInfo(lines: [], qualities: [StreamQuality(id: 0, name: "原画"), StreamQuality(id: 100, name: "高清")], currentQuality: quality ?? 0, headers: [:])
+        return PlaybackInfo(lines: [], qualities: [StreamQuality(id: 0, name: "原画"), StreamQuality(id: 100, name: "高清")], currentQuality: returnsDefault ? 0 : (quality ?? 0), headers: [:])
     }
 }

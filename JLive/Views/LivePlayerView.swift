@@ -34,6 +34,7 @@ final class PlayerContainerController: UIViewController, @preconcurrency AVPictu
     private var fullScreen: FullscreenPlayerController?
     private var pip: AVPictureInPictureController?
     private var pipObservation: NSKeyValueObservation?
+    private var returnOrientation: UIInterfaceOrientation = .portrait
 
     init(model: PlayerModel, chat: ChatModel, presentation: PlayerPresentation, openWebsite: @escaping () -> Void) {
         self.model = model; self.chat = chat; self.presentation = presentation; self.openWebsite = openWebsite
@@ -79,10 +80,17 @@ final class PlayerContainerController: UIViewController, @preconcurrency AVPictu
                 self.attach(host, to: self)
                 self.fullScreen = nil
                 self.presentation.isFullScreen = false
-                self.view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+                let orientation = self.returnOrientation
+                let mask: UIInterfaceOrientationMask = switch orientation {
+                case .landscapeLeft: .landscapeLeft
+                case .landscapeRight: .landscapeRight
+                default: .portrait
+                }
+                self.view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: mask))
             }
         } else {
             guard presentedViewController == nil else { return }
+            returnOrientation = view.window?.windowScene?.effectiveGeometry.interfaceOrientation ?? .portrait
             presentation.isFullScreen = true
             let full = FullscreenPlayerController()
             full.modalPresentationStyle = .fullScreen
@@ -182,6 +190,7 @@ private struct PlayerSurface: View {
     @State private var showsControls = true
     @State private var showsSettings = false
     @State private var interaction = 0
+    @State private var showsQualityMessage = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -208,6 +217,17 @@ private struct PlayerSurface: View {
                         .allowsHitTesting(false)
                 }
                 if let error = model.errorMessage { errorView(error) }
+                if showsQualityMessage, let message = model.qualitySwitchMessage {
+                    VStack {
+                        Text(message).font(.caption.weight(.medium)).foregroundStyle(.white)
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .background(.black.opacity(0.7), in: Capsule())
+                            .accessibilityIdentifier("qualitySwitchMessage")
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.top, presentation.isFullScreen ? 56 : 8)
+                    .allowsHitTesting(false)
+                }
                 if showsControls, !showsSettings {
                     controls.padding(presentation.isFullScreen ? geometry.safeAreaInsets : EdgeInsets())
                 }
@@ -225,6 +245,13 @@ private struct PlayerSurface: View {
         }
         .ignoresSafeArea(.container, edges: presentation.isFullScreen ? .all : [])
         .preferredColorScheme(.dark)
+        .task(id: model.qualitySwitchMessage) {
+            showsQualityMessage = model.qualitySwitchMessage != nil
+            guard showsQualityMessage else { return }
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            showsQualityMessage = false
+        }
         .task(id: interaction) {
             guard !showsSettings else { return }
             try? await Task.sleep(for: .seconds(5))
@@ -263,11 +290,12 @@ private struct PlayerSurface: View {
                             }
                         }
                     } label: {
-                        Text(info.qualities.first { $0.id == model.selectedQuality }?.name ?? "画质")
+                        Text(model.qualityLabel)
                             .font(.system(size: 12, weight: .medium)).lineLimit(1).frame(minHeight: 44)
                     }
                     .disabled(model.isResolving).padding(.horizontal, 5)
                     .accessibilityLabel("切换清晰度")
+                    .accessibilityValue(model.qualityLabel)
                 }
                 button(model.muteState ? "speaker.slash.fill" : "speaker.wave.2.fill", label: model.muteState ? "开启声音" : "静音") { model.isMuted.toggle() }
                 if chatEnabled {
@@ -325,6 +353,8 @@ private struct PlayerSettings: View {
                         Picker("清晰度", selection: Binding(get: { model.selectedQuality ?? info.currentQuality }, set: { quality in Task { await model.load(quality: quality) } })) {
                             ForEach(info.qualities) { Text($0.name).tag($0.id) }
                         }.disabled(model.isResolving)
+                            .accessibilityIdentifier("playerQualityPicker")
+                            .accessibilityValue(model.qualityLabel)
                         Picker("播放线路", selection: Binding(get: { model.selectedLine }, set: { model.playLine($0) })) {
                             ForEach(info.lines.indices, id: \.self) { Text("线路 \($0 + 1)").tag($0) }
                         }.disabled(model.isResolving)
