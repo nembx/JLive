@@ -58,6 +58,9 @@ jobs:
       - name: 运行核心测试
         run: swift test --package-path JLiveCore 2>&1 | tee test.log
 
+      - name: 安装视频渲染编译组件
+        run: xcodebuild -downloadComponent MetalToolchain
+
       - name: 编译未签名的 App
         env:
           VERSION: ${{ steps.version.outputs.version }}

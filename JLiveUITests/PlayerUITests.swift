@@ -54,11 +54,70 @@ final class PlayerUITests: XCTestCase {
         screenshot.name = "画质回退反馈"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
 
-    private func launchQualityFixture(fallsBack: Bool) throws -> XCUIApplication {
+    func testPlatformQualityNoticeRemainsAvailableInPlayerSettings() throws {
+        let app = try launchQualityFixture(fallsBack: true, showsNotice: true)
+        defer { app.terminate() }
+        let quality = app.buttons["切换清晰度"]
+        XCTAssertTrue(quality.waitForExistence(timeout: 8))
+        quality.tap()
+        app.buttons["原画"].tap()
+        XCTAssertTrue(app.staticTexts["原画暂不可用，当前为超清\n平台当前仅提供超清"].waitForExistence(timeout: 8))
+        XCTAssertEqual(quality.value as? String, "超清")
+        app.buttons["播放器设置"].tap()
+        let notice = app.staticTexts["qualityAvailabilityNotice"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 3))
+        XCTAssertEqual(notice.label, "平台当前仅提供超清")
+    }
+
+    func testFLVPlaybackAndQualitySwitchKeepPlaying() throws {
+        let app = try launchQualityFixture(fallsBack: false, videoExtension: "flv")
+        defer { app.terminate() }
+        let surface = app.otherElements["videoSurface"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 10))
+        wait(for: [expectation(for: NSPredicate(format: "value == %@", "播放中"), evaluatedWith: surface)], timeout: 15)
+        let quality = app.buttons["切换清晰度"]
+        if !quality.exists { surface.tap() }
+        quality.tap()
+        app.buttons["蓝光"].tap()
+        wait(for: [expectation(for: NSPredicate(format: "value == %@", "蓝光"), evaluatedWith: quality)], timeout: 8)
+        XCTAssertEqual(quality.value as? String, "蓝光")
+        wait(for: [expectation(for: NSPredicate(format: "value == %@", "播放中"), evaluatedWith: surface)], timeout: 15)
+        app.buttons["全屏播放"].tap()
+        XCTAssertTrue(app.buttons["退出全屏"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(surface.value as? String, "播放中")
+        app.buttons["退出全屏"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["全屏播放"].waitForExistence(timeout: 5))
+    }
+
+    func testLiveDouyuQualitySwitch() throws {
+        guard ProcessInfo.processInfo.environment["JLIVE_UI_LIVE_TESTS"] == "1" else { throw XCTSkip("真实直播验证按需启用") }
         let app = XCUIApplication()
-        let video = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "landscape", withExtension: "mp4"))
+        app.launchArguments = ["--muted", "--open-room", "https://www.douyu.com/36252"]
+        app.launch()
+        defer { app.terminate() }
+        let surface = app.otherElements["videoSurface"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 10))
+        wait(for: [expectation(for: NSPredicate(format: "value == %@", "播放中"), evaluatedWith: surface)], timeout: 30)
+        let quality = app.buttons["切换清晰度"]
+        for name in ["高清", "超清"] {
+            if !quality.exists { surface.tap() }
+            quality.tap()
+            let tier = app.buttons[name]
+            XCTAssertTrue(tier.waitForExistence(timeout: 5))
+            tier.tap()
+            wait(for: [expectation(for: NSPredicate(format: "value == %@", name), evaluatedWith: quality)], timeout: 15)
+            wait(for: [expectation(for: NSPredicate(format: "value == %@", "播放中"), evaluatedWith: surface)], timeout: 30)
+        }
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "斗鱼真实超清 FLV 播放"; screenshot.lifetime = .keepAlways; add(screenshot)
+    }
+
+    private func launchQualityFixture(fallsBack: Bool, showsNotice: Bool = false, videoExtension: String = "mp4") throws -> XCUIApplication {
+        let app = XCUIApplication()
+        let video = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "landscape", withExtension: videoExtension))
         app.launchArguments = ["--muted", "--ui-fixtures", "--fixture-quality-switch", "--fixture-video", video.path, "--open-room", "https://live.bilibili.com/1"]
         if fallsBack { app.launchArguments.append("--fixture-quality-fallback") }
+        if showsNotice { app.launchArguments.append("--fixture-quality-notice") }
         app.launch()
         return app
     }
@@ -324,15 +383,15 @@ final class PlayerUITests: XCTestCase {
     }
 
     func testFullscreenKeepsSettingsAndReturnsToInlinePlayer() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["--muted", "--open-room", "https://live.bilibili.com/545068"]
-        app.launch()
+        // This checks presentation and settings; an anchor going offline must not change the test path.
+        let app = try launchQualityFixture(fallsBack: false)
         defer { app.terminate() }
+        let surface = app.otherElements["videoSurface"]
+        wait(for: [expectation(for: NSPredicate(format: "value == %@", "播放中"), evaluatedWith: surface)], timeout: 8)
         let full = app.buttons["全屏播放"]
         XCTAssertTrue(full.waitForExistence(timeout: 12))
         // Keep the controls visible while making assertions, just as a viewer taps the picture.
-        app.otherElements["videoSurface"].tap()
-        if !full.exists { app.otherElements["videoSurface"].tap() }
+        if !full.exists { surface.tap() }
         // The full screen action is the final control in the bottom right of the video.
         let settings = app.buttons["播放器设置"]
         XCTAssertGreaterThan(full.frame.minX, settings.frame.minX)

@@ -34,6 +34,7 @@ final class PlayerContainerController: UIViewController, @preconcurrency AVPictu
     private var fullScreen: FullscreenPlayerController?
     private var pip: AVPictureInPictureController?
     private var pipObservation: NSKeyValueObservation?
+    private weak var pipSource: AnyObject?
     private var returnOrientation: UIInterfaceOrientation = .portrait
 
     init(model: PlayerModel, chat: ChatModel, presentation: PlayerPresentation, openWebsite: @escaping () -> Void) {
@@ -48,7 +49,8 @@ final class PlayerContainerController: UIViewController, @preconcurrency AVPictu
         let surface = PlayerSurface(model: model, chat: chat, presentation: presentation,
             toggleFullScreen: { [weak self] in self?.toggleFullScreen() },
             togglePiP: { [weak self] in self?.togglePiP() }, openWebsite: openWebsite,
-            onLayer: { [weak self] in self?.configurePiP($0) })
+            onLayer: { [weak self] in self?.configurePiP($0) },
+            onFLVPiP: { [weak self] in self?.installPiP($0, source: $0) })
         let host = UIHostingController(rootView: surface)
         host.view.backgroundColor = .black
         self.host = host
@@ -106,8 +108,18 @@ final class PlayerContainerController: UIViewController, @preconcurrency AVPictu
     }
 
     private func configurePiP(_ layer: AVPlayerLayer) {
-        guard pip == nil, AVPictureInPictureController.isPictureInPictureSupported() else { return }
+        guard pipSource !== layer, AVPictureInPictureController.isPictureInPictureSupported() else { return }
         let controller = AVPictureInPictureController(playerLayer: layer)
+        installPiP(controller, source: layer)
+    }
+    private func installPiP(_ controller: AVPictureInPictureController?, source: AnyObject?) {
+        guard pipSource !== source else { return }
+        pipObservation?.invalidate()
+        pip?.stopPictureInPicture()
+        pip?.delegate = nil
+        presentation.isInPictureInPicture = false
+        presentation.canPictureInPicture = false
+        pipSource = source
         pip = controller
         controller?.delegate = self
         controller?.canStartPictureInPictureAutomaticallyFromInline = false
@@ -157,6 +169,7 @@ private final class FullscreenPlayerController: UIViewController {
 
 private struct VideoLayerView: UIViewRepresentable {
     let player: AVPlayer
+    let isPlaying: Bool
     let onLayer: (AVPlayerLayer) -> Void
     func makeUIView(context: Context) -> VideoLayerSurface {
         let view = VideoLayerSurface()
@@ -170,7 +183,7 @@ private struct VideoLayerView: UIViewRepresentable {
     }
     func updateUIView(_ view: VideoLayerSurface, context: Context) {
         view.playerLayer.player = player
-        view.accessibilityValue = player.timeControlStatus == .playing ? "播放中" : "未播放"
+        view.accessibilityValue = isPlaying ? "播放中" : "未播放"
     }
     static func dismantleUIView(_ view: VideoLayerSurface, coordinator: ()) { view.playerLayer.player = nil }
 }
@@ -187,17 +200,26 @@ private struct PlayerSurface: View {
     let togglePiP: () -> Void
     let openWebsite: () -> Void
     let onLayer: (AVPlayerLayer) -> Void
+    let onFLVPiP: (AVPictureInPictureController) -> Void
     @State private var showsControls = true
     @State private var showsSettings = false
     @State private var interaction = 0
     @State private var showsQualityMessage = false
+    @State private var showsBilibiliLogin = false
+    @State private var showsQualityPicker = false
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 Color.black
                 // Fit the height while preserving the stream's aspect ratio; the container clips extra width.
-                VideoLayerView(player: model.player, onLayer: onLayer)
+                Group {
+                    if let playback = model.flvPlayback {
+                        FLVVideoView(playback: playback, isPlaying: model.isPlaying, onPiP: onFLVPiP)
+                    } else {
+                        VideoLayerView(player: model.player, isPlaying: model.isPlaying, onLayer: onLayer)
+                    }
+                }
                     .frame(width: presentation.isFullScreen ? geometry.size.height * model.videoAspectRatio : geometry.size.width,
                            height: geometry.size.height)
                     .frame(width: geometry.size.width, height: geometry.size.height)
@@ -234,7 +256,8 @@ private struct PlayerSurface: View {
                 if showsSettings {
                     HStack {
                         Spacer(minLength: 0)
-                        PlayerSettings(model: model, chat: chat, presentation: presentation, togglePiP: togglePiP) { showsSettings = false; interaction += 1 }
+                        PlayerSettings(model: model, chat: chat, presentation: presentation, togglePiP: togglePiP,
+                            login: { showsBilibiliLogin = true }) { showsSettings = false; interaction += 1 }
                             .frame(width: min(320, geometry.size.width - 24))
                             .padding(12)
                     }
@@ -245,6 +268,23 @@ private struct PlayerSurface: View {
         }
         .ignoresSafeArea(.container, edges: presentation.isFullScreen ? .all : [])
         .preferredColorScheme(.dark)
+        .confirmationDialog("选择清晰度", isPresented: $showsQualityPicker, titleVisibility: .visible) {
+            if let info = model.playbackInfo {
+                ForEach(info.qualities) { quality in
+                    Button(quality.name) { Task { await model.load(quality: quality.id) } }
+                }
+                if model.room.platform == .bilibili, !BilibiliSession.shared.isLoggedIn {
+                    Button("登录 B站获取更多画质") { showsBilibiliLogin = true }
+                }
+            }
+        } message: {
+            if let notice = model.playbackInfo?.qualityNotice { Text(notice) }
+            else { Text("当前画质：\(model.qualityLabel)") }
+        }
+        .onChange(of: showsQualityPicker) { _, _ in interaction += 1 }
+        .sheet(isPresented: $showsBilibiliLogin) {
+            BilibiliLoginView { Task { await model.load(preference: .original) } }
+        }
         .task(id: model.qualitySwitchMessage) {
             showsQualityMessage = model.qualitySwitchMessage != nil
             guard showsQualityMessage else { return }
@@ -253,7 +293,7 @@ private struct PlayerSurface: View {
             showsQualityMessage = false
         }
         .task(id: interaction) {
-            guard !showsSettings else { return }
+            guard !showsSettings, !showsQualityPicker else { return }
             try? await Task.sleep(for: .seconds(5))
             guard !Task.isCancelled, model.isPlaying, !UIAccessibility.isVoiceOverRunning else { return }
             withAnimation(.easeOut(duration: 0.2)) { showsControls = false }
@@ -281,15 +321,8 @@ private struct PlayerSurface: View {
                 Text("直播").font(.system(size: 11, weight: .semibold)).padding(.horizontal, 7).padding(.vertical, 3)
                     .background(JLiveTheme.lime.opacity(0.22), in: Capsule()).foregroundStyle(JLiveTheme.lime)
                 Spacer(minLength: 0)
-                if let info = model.playbackInfo {
-                    Menu {
-                        ForEach(info.qualities) { quality in
-                            Button { Task { await model.load(quality: quality.id) } } label: {
-                                if quality.id == model.selectedQuality { Label(quality.name, systemImage: "checkmark") }
-                                else { Text(quality.name) }
-                            }
-                        }
-                    } label: {
+                if model.playbackInfo != nil {
+                    Button { showsQualityPicker = true } label: {
                         Text(model.qualityLabel)
                             .font(.system(size: 12, weight: .medium)).lineLimit(1).frame(minHeight: 44)
                     }
@@ -333,11 +366,46 @@ private struct PlayerSurface: View {
     }
 }
 
+private struct FLVVideoView: UIViewRepresentable {
+    let playback: FLVPlayback
+    let isPlaying: Bool
+    let onPiP: (AVPictureInPictureController) -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .black
+        container.isAccessibilityElement = true
+        container.accessibilityIdentifier = "videoSurface"
+        container.accessibilityLabel = "直播画面"
+        attachVideo(to: container)
+        return container
+    }
+    private func attachVideo(to container: UIView) {
+        let video = playback.view
+        guard container.subviews.first !== video else { return }
+        container.subviews.forEach { $0.removeFromSuperview() }
+        video.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(video)
+        NSLayoutConstraint.activate([
+            video.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            video.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            video.topAnchor.constraint(equalTo: container.topAnchor),
+            video.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+    }
+    func updateUIView(_ view: UIView, context: Context) {
+        attachVideo(to: view)
+        view.accessibilityValue = isPlaying ? "播放中" : "未播放"
+        if let controller = playback.pictureInPictureController { onPiP(controller) }
+    }
+}
+
 private struct PlayerSettings: View {
     let model: PlayerModel
     @Bindable var chat: ChatModel
     let presentation: PlayerPresentation
     let togglePiP: () -> Void
+    let login: () -> Void
     let close: () -> Void
     var body: some View {
         VStack(spacing: 0) {
@@ -355,6 +423,20 @@ private struct PlayerSettings: View {
                         }.disabled(model.isResolving)
                             .accessibilityIdentifier("playerQualityPicker")
                             .accessibilityValue(model.qualityLabel)
+                        if let notice = info.qualityNotice {
+                            Text(notice).font(.caption).foregroundStyle(.secondary)
+                                .accessibilityIdentifier("qualityAvailabilityNotice")
+                        }
+                        if model.room.platform == .bilibili {
+                            if BilibiliSession.shared.isLoggedIn {
+                                Button("退出 B站登录") {
+                                    BilibiliSession.shared.signOut()
+                                    Task { await model.load(preference: .original) }
+                                }
+                            } else {
+                                Button("登录 B站获取更多画质", action: login)
+                            }
+                        }
                         Picker("播放线路", selection: Binding(get: { model.selectedLine }, set: { model.playLine($0) })) {
                             ForEach(info.lines.indices, id: \.self) { Text("线路 \($0 + 1)").tag($0) }
                         }.disabled(model.isResolving)

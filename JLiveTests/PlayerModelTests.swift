@@ -4,6 +4,23 @@ import JLiveCore
 
 @MainActor
 final class PlayerModelTests: XCTestCase {
+    func testInitialPlaybackShowsThePlatformQualityNotice() async {
+        let model = makeModel(QualityProvider(notice: "平台当前仅返回原画"))
+        await model.load()
+        XCTAssertEqual(model.qualitySwitchMessage, "平台当前仅返回原画")
+        XCTAssertEqual(model.playbackInfo?.qualityNotice, "平台当前仅返回原画")
+        model.stop()
+    }
+
+    func testFailedQualitySelectionIncludesThePlatformReason() async {
+        let model = makeModel(QualityProvider(returnsDefault: true, notice: "所选画质被平台回退"))
+        await model.load()
+        await model.load(quality: 100)
+        XCTAssertEqual(model.selectedQuality, 0)
+        XCTAssertEqual(model.qualitySwitchMessage, "高清暂不可用，当前为原画\n所选画质被平台回退")
+        model.stop()
+    }
+
     func testUnavailableManualQualityExplainsTheActualQuality() async {
         let provider = QualityProvider(returnsDefault: true)
         let model = makeModel(provider)
@@ -112,13 +129,15 @@ private actor QualityProvider: LiveProvider {
     private let failsPreferred: Bool
     private let holdsPreferred: Bool
     private let returnsDefault: Bool
+    private let notice: String?
     private var gate: CheckedContinuation<Void, Never>?
     var isWaiting: Bool { gate != nil }
 
-    init(failsPreferred: Bool = false, holdsPreferred: Bool = false, returnsDefault: Bool = false) {
+    init(failsPreferred: Bool = false, holdsPreferred: Bool = false, returnsDefault: Bool = false, notice: String? = nil) {
         self.failsPreferred = failsPreferred
         self.holdsPreferred = holdsPreferred
         self.returnsDefault = returnsDefault
+        self.notice = notice
     }
 
     func release() { gate?.resume(); gate = nil }
@@ -130,6 +149,6 @@ private actor QualityProvider: LiveProvider {
             if holdsPreferred { await withCheckedContinuation { gate = $0 } }
             if failsPreferred { throw LiveError.noPlayableStream }
         }
-        return PlaybackInfo(lines: [], qualities: [StreamQuality(id: 0, name: "原画"), StreamQuality(id: 100, name: "高清")], currentQuality: returnsDefault ? 0 : (quality ?? 0), headers: [:])
+        return PlaybackInfo(lines: [], qualities: [StreamQuality(id: 0, name: "原画"), StreamQuality(id: 100, name: "高清")], currentQuality: returnsDefault ? 0 : (quality ?? 0), headers: [:], qualityNotice: notice)
     }
 }

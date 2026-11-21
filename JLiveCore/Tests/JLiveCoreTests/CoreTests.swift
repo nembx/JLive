@@ -111,6 +111,28 @@ struct CoreTests {
         #expect(requested.qualities.map(\.id) == [250])
     }
 
+    @Test func bilibiliGuestQualityNoticeMatchesTheReturnedStream() throws {
+        let data = try json(#"{"playurl_info":{"playurl":{"g_qn_desc":[{"qn":400,"desc":"蓝光"},{"qn":250,"desc":"超清"}],"stream":[{"protocol_name":"http_hls","format":[{"format_name":"fmp4","codec":[{"codec_name":"avc","current_qn":250,"accept_qn":[400,250],"base_url":"/ultra.m3u8","url_info":[{"host":"https://cdn.example.com","extra":""}]}]}]}]}}}"#)
+        let info = try BilibiliProvider.parsePlayback(data, headers: [:], requestedQuality: 400, isGuest: true)
+        #expect(info.currentQuality == 250)
+        #expect(info.qualityNotice?.contains("本次返回超清") == true)
+        #expect(info.qualityNotice?.contains("登录") == true)
+        let signedIn = try BilibiliProvider.parsePlayback(data, headers: [:], requestedQuality: 400)
+        #expect(signedIn.qualityNotice?.contains("未提供所选画质") == true)
+        #expect(signedIn.qualityNotice?.contains("登录") == false)
+    }
+
+    @Test func bilibiliKeepsHighQualityHEVCAndFLVWhenThePlayerSupportsThem() throws {
+        let data = try json(#"{"playurl_info":{"playurl":{"g_qn_desc":[{"qn":10000,"desc":"原画"},{"qn":400,"desc":"蓝光"},{"qn":250,"desc":"超清"}],"stream":[{"protocol_name":"http_hls","format":[{"format_name":"fmp4","codec":[{"codec_name":"avc","current_qn":250,"accept_qn":[400,250],"base_url":"/ultra.m3u8","url_info":[{"host":"https://cdn.example.com","extra":""}]},{"codec_name":"hevc","current_qn":10000,"accept_qn":[10000,400,250],"base_url":"/original.m3u8","url_info":[{"host":"https://cdn.example.com","extra":""}]}]}]},{"protocol_name":"http_stream","format":[{"format_name":"flv","codec":[{"codec_name":"avc","current_qn":10000,"accept_qn":[10000,400,250],"base_url":"/original.flv","url_info":[{"host":"https://cdn.example.com","extra":""}]}]}]}]}}}"#)
+        let info = try BilibiliProvider.parsePlayback(data, headers: [:], requestedQuality: 10000, allowsAlternativeFormats: true)
+        #expect(info.currentQuality == 10000)
+        #expect(info.lines.map(\.url.path) == ["/original.m3u8", "/original.flv"])
+        #expect(info.qualities.map(\.id) == [10000, 400, 250])
+        let fallback = try BilibiliProvider.parsePlayback(data, headers: [:], requestedQuality: 400, allowsAlternativeFormats: true)
+        #expect(fallback.currentQuality == 250)
+        #expect(fallback.lines.map(\.url.path) == ["/ultra.m3u8"])
+    }
+
     @Test func douyuListExcludesPromotionsAndMapsNumericID() async throws {
         let client = StubClient(response: try json("""
         {"error":0,"data":{"pgcnt":3,"rl":[

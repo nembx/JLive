@@ -120,26 +120,137 @@ extension DouyuProvider {
     }
 
     public func playback(roomID: String, quality: Int?) async throws -> PlaybackInfo {
+        do {
+            return try await desktopPlayback(roomID: roomID, quality: quality)
+        } catch {
+            try Task.checkCancellation()
+            return try await mobilePlayback(roomID: roomID, quality: quality)
+        }
+    }
+
+    private func desktopPlayback(roomID: String, quality: Int?) async throws -> PlaybackInfo {
         let headers = ["Referer": "https://www.douyu.com/\(roomID)", "User-Agent": HTTPClient.userAgent]
         let result = try await client.get(try endpoint("https://www.douyu.com/swf_api/homeH5Enc", ["rids": roomID]), headers: headers)
         let signature = try DouyuSigner.sign(result["data"]["room\(roomID)"].string, roomID: roomID)
-        // Mobile ratestream returns HLS instead of the desktop endpoint's FLV stream.
-        let body = "\(signature)&ver=219032101&rid=\(roomID)&rate=\(quality ?? 0)"
-        let response = try await client.post(try endpoint("https://m.douyu.com/api/room/ratestream"), body: body, headers: headers)
-        return try Self.parsePlayback(response, quality: quality, headers: headers)
+        let url = try endpoint("https://www.douyu.com/lapi/live/getH5Play/\(roomID)")
+        let metadata = try await client.post(url,
+            body: "\(signature)&cdn=&rate=-1&ver=Douyu_223061205&iar=1&ive=1&hevc=0&fa=0", headers: headers)
+        guard !metadata["error"].isNull, metadata["error"].int == 0 else { throw LiveError.invalidResponse }
+        let cdns = metadata["data"]["cdnsWithName"].array.map { $0["cdn"].string }.filter { !$0.isEmpty }
+            .sorted { !$0.hasPrefix("scdn") && $1.hasPrefix("scdn") }
+        guard !cdns.isEmpty else { throw LiveError.noPlayableStream }
+        let selected = quality ?? metadata["data"]["multirates"].array.first?["rate"].int ?? 0
+        for cdn in cdns {
+            // Match Simple Live's quality request exactly. The discovery flags belong
+            // to the metadata request; adding them here can make the service ignore rate.
+            do {
+                let response = try await client.post(url, body: "\(signature)&cdn=\(cdn)&rate=\(selected)", headers: headers)
+                if let info = try? Self.parseDesktopPlayback(response, quality: selected, headers: headers) { return info }
+            } catch { try Task.checkCancellation() }
+        }
+        throw LiveError.noPlayableStream
     }
 
-    static func parsePlayback(_ response: JSONValue, quality: Int?, headers: [String: String]) throws -> PlaybackInfo {
-        guard response["code"].int == 0 else { throw LiveError.platform(response["msg"].string) }
+    static func parseDesktopPlayback(_ response: JSONValue, quality: Int?, headers: [String: String]) throws -> PlaybackInfo {
+        guard !response["error"].isNull, response["error"].int == 0 else { throw LiveError.platform(response["msg"].string) }
         let data = response["data"]
+        let raw = (data["rtmp_url"].string + "/" + data["rtmp_live"].string).replacingOccurrences(of: "&amp;", with: "&")
+        guard let url = URL(string: raw), ["https", "http"].contains(url.scheme ?? ""), url.host != nil,
+              ["flv", "m3u8"].contains(url.pathExtension.lowercased()), !data["rate"].isNull else { throw LiveError.noPlayableStream }
+        var seen = Set<Int>()
+        let qualities = data["multirates"].array.compactMap { item -> StreamQuality? in
+            guard !item["rate"].isNull, !item["name"].string.isEmpty, seen.insert(item["rate"].int).inserted else { return nil }
+            return StreamQuality(id: item["rate"].int, name: item["name"].string)
+        }
+        var actual = data["rate"].int
+        if let bitrate = capture(#"_([0-9]+)\.(?:flv|m3u8)$"#, in: url.path).flatMap(Int.init),
+           let rendition = data["multirates"].array.first(where: { $0["bit"].int == bitrate }) {
+            actual = rendition["rate"].int
+        }
+        guard let current = qualities.first(where: { $0.id == actual }) else { throw LiveError.invalidResponse }
+        let notice = quality.map { $0 != actual } == true ? "斗鱼本次返回\(current.name)，所选画质被平台回退。" : nil
+        return PlaybackInfo(lines: [StreamLine(url: url)], qualities: qualities, currentQuality: actual, headers: headers, qualityNotice: notice)
+    }
+
+    private func mobilePlayback(roomID: String, quality: Int?) async throws -> PlaybackInfo {
+        let headers = ["Referer": "https://m.douyu.com/\(roomID)", "User-Agent": HTTPClient.userAgent]
+        let deviceID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        var requestHeaders = headers
+        requestHeaders["Cookie"] = "dy_did=\(deviceID);acf_did=\(deviceID);"
+        async let metadata = playbackRates(roomID: roomID, deviceID: deviceID, headers: requestHeaders)
+        // The mobile player has its own signing script and now uses getStreamUrl.
+        // ratestream ignores rate, and the desktop signing script is a different version.
+        let html = try await client.text(try endpoint("https://m.douyu.com/\(roomID)"), headers: requestHeaders)
+        let signature = try DouyuSigner.sign(Self.mobileSigningScript(html), roomID: roomID, deviceID: deviceID)
+        let body = "\(signature)&ver=22011191&rid=\(roomID)&rate=\(quality ?? -1)"
+        let response = try await client.post(try endpoint("https://m.douyu.com/hgapi/livenc/room/getStreamUrl"), body: body, headers: requestHeaders)
+        // Some mobile responses echo rate even when the HLS URL is a different rendition.
+        // The desktop metadata supplies the authoritative rate -> bitrate mapping.
+        let rates = (try? await metadata) ?? []
+        try Task.checkCancellation()
+        return try Self.parsePlayback(response, quality: quality, headers: headers, rates: rates)
+    }
+
+    static func mobileSigningScript(_ html: String) throws -> String {
+        let regex = try NSRegularExpression(pattern: #"<script\b[^>]*>([\s\S]*?)</script>"#, options: .caseInsensitive)
+        for match in regex.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
+            guard let range = Range(match.range(at: 1), in: html) else { continue }
+            let script = String(html[range])
+            if script.contains("function ub98484234(") { return script }
+        }
+        throw LiveError.invalidResponse
+    }
+
+    private func playbackRates(roomID: String, deviceID: String, headers: [String: String]) async throws -> [JSONValue] {
+        let result = try await client.get(try endpoint("https://www.douyu.com/swf_api/homeH5Enc", ["rids": roomID]), headers: headers)
+        let signature = try DouyuSigner.sign(result["data"]["room\(roomID)"].string, roomID: roomID, deviceID: deviceID)
+        let response = try await client.post(try endpoint("https://www.douyu.com/lapi/live/getH5Play/\(roomID)"),
+            body: "\(signature)&cdn=&rate=-1&ver=Douyu_223061205&iar=0&ive=0&hevc=0&fa=0", headers: headers)
+        guard !response["error"].isNull, response["error"].int == 0 else { throw LiveError.invalidResponse }
+        return response["data"]["multirates"].array
+    }
+
+    static func parsePlayback(_ response: JSONValue, quality: Int?, headers: [String: String], rates: [JSONValue] = []) throws -> PlaybackInfo {
+        let status = response["error"].isNull ? response["code"] : response["error"]
+        guard !status.isNull else { throw LiveError.invalidResponse }
+        guard status.int == 0 else { throw LiveError.platform(response["msg"].string) }
+        let data = response["data"]
+        guard data["pass"].int == 0 else { throw LiveError.platform("该直播间需要在斗鱼官网验证密码") }
         let raw = data["url"].string.replacingOccurrences(of: "&amp;", with: "&")
-        guard let url = URL(string: raw), ["http", "https"].contains(url.scheme ?? ""), url.path.contains(".m3u8") else {
+        guard let url = URL(string: raw), ["http", "https"].contains(url.scheme ?? ""), url.host != nil, url.path.contains(".m3u8") else {
             throw LiveError.noPlayableStream
         }
-        var qualities = data["multirates"].array.map { StreamQuality(id: $0["rate"].int, name: $0["name"].string) }
-        if qualities.isEmpty { qualities = [StreamQuality(id: data["rate"].int, name: "自动画质")] }
+        let settings = data["settings"].isNull ? data["multirates"].array : data["settings"].array
+        var seen = Set<Int>()
+        var qualities = settings.compactMap { item -> StreamQuality? in
+            guard !item["rate"].isNull, !item["name"].string.isEmpty, item["high_bit"].int == 0,
+                  seen.insert(item["rate"].int).inserted else { return nil }
+            return StreamQuality(id: item["rate"].int, name: item["name"].string)
+        }
+        var actual = data["rate"].isNull ? -1 : data["rate"].int
+        if let bitrate = capture(#"_([0-9]+)\.m3u8$"#, in: url.path).flatMap(Int.init) {
+            let mapping = rates.isEmpty ? data["multirates"].array : rates
+            // Never label a suffixed HLS stream with an unverified, echoed rate.
+            let rendition = mapping.first { $0["bit"].int == bitrate }
+            actual = rendition?["rate"].int ?? -1
+            if let rendition, !qualities.contains(where: { $0.id == actual }) {
+                qualities.append(StreamQuality(id: actual, name: rendition["name"].string))
+            }
+        }
+        if !qualities.contains(where: { $0.id == actual }) {
+            qualities.append(StreamQuality(id: actual, name: "平台默认"))
+        }
+        let actualName = qualities.first { $0.id == actual }?.name ?? "平台默认"
+        let notice: String?
+        if actual == -1 {
+            notice = "斗鱼未提供可核实的当前画质，暂按平台默认播放。"
+        } else if quality.map({ $0 != actual }) == true {
+            notice = "斗鱼本次返回\(actualName)，所选画质被平台回退。"
+        } else if quality == nil, actual != data["rate"].int {
+            notice = "斗鱼当前实际提供\(actualName)，更多画质以平台返回为准。"
+        } else { notice = nil }
         return PlaybackInfo(lines: [StreamLine(url: url)], qualities: qualities,
-            currentQuality: data["rate"].isNull ? (quality ?? 0) : data["rate"].int, headers: headers)
+            currentQuality: actual, headers: headers, qualityNotice: notice)
     }
 
     public func chat(roomID: String) async throws -> LiveChatEndpoint {
@@ -152,7 +263,7 @@ extension DouyuProvider {
 }
 
 enum DouyuSigner {
-    static func sign(_ script: String, roomID: String, timestamp: Int = Int(Date().timeIntervalSince1970)) throws -> String {
+    static func sign(_ script: String, roomID: String, timestamp: Int = Int(Date().timeIntervalSince1970), deviceID: String = "10000000000000000000000000001501") throws -> String {
         guard script.count < 200_000, !script.isEmpty, let context = JSContext() else { throw LiveError.invalidResponse }
         // Isolated JavaScriptCore context: no browser, filesystem or network objects are exposed.
         let hash: @convention(block) (String) -> String = { md5($0) }
@@ -160,7 +271,7 @@ enum DouyuSigner {
         context.evaluateScript("var CryptoJS = { MD5: function(s) { var h = jliveMD5(String(s)); return { toString: function() { return h; } }; } };")
         context.evaluateScript(script)
         guard context.exception == nil, let function = context.objectForKeyedSubscript("ub98484234"), !function.isUndefined else { throw LiveError.invalidResponse }
-        let value = function.call(withArguments: [roomID, "10000000000000000000000000001501", String(timestamp)])?.toString() ?? ""
+        let value = function.call(withArguments: [roomID, deviceID, String(timestamp)])?.toString() ?? ""
         guard context.exception == nil, value.contains("sign="), value.count < 4096 else { throw LiveError.invalidResponse }
         return value
     }

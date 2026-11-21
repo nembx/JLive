@@ -2,8 +2,8 @@ import Foundation
 import Security
 import WebKit
 
-/// Versions up to 0.5.0 offered Bilibili and Douyin login. JLive no longer uses accounts,
-/// so the sessions those versions saved are removed once instead of staying on the device.
+/// Remove the login sessions retired after 0.5.0 once. The optional Bilibili
+/// playback login uses a separate keychain item and is not part of this cleanup.
 enum LegacyAccountCleanup {
     @MainActor static func run(defaults: UserDefaults = .standard) {
         let done = "jlive.legacyAccountsRemoved"

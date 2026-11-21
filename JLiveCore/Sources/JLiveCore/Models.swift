@@ -100,11 +100,13 @@ public struct PlaybackInfo: Sendable {
     public let qualities: [StreamQuality]
     public let currentQuality: Int
     public let headers: [String: String]
-    public init(lines: [StreamLine], qualities: [StreamQuality], currentQuality: Int, headers: [String: String]) {
+    public let qualityNotice: String?
+    public init(lines: [StreamLine], qualities: [StreamQuality], currentQuality: Int, headers: [String: String], qualityNotice: String? = nil) {
         self.lines = lines
         self.qualities = qualities
         self.currentQuality = currentQuality
         self.headers = headers
+        self.qualityNotice = qualityNotice
     }
 }
 

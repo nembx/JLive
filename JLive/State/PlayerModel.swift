@@ -7,6 +7,7 @@ import JLiveCore
 final class PlayerModel {
     private(set) var room: LiveRoom
     let player = AVPlayer()
+    private(set) var flvPlayback: FLVPlayback?
     private(set) var playbackInfo: PlaybackInfo?
     private(set) var isResolving = false
     private(set) var isPreparing = false
@@ -23,8 +24,8 @@ final class PlayerModel {
     private(set) var isBuffering = false
     private(set) var videoAspectRatio = 16.0 / 9.0
     var isMuted: Bool {
-        get { player.isMuted }
-        set { player.isMuted = newValue; muteState = newValue }
+        get { flvPlayback?.isMuted ?? player.isMuted }
+        set { player.isMuted = newValue; flvPlayback?.isMuted = newValue; muteState = newValue }
     }
     private(set) var muteState = false
     private var wantsPlayback = true
@@ -47,6 +48,7 @@ final class PlayerModel {
         timeObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] player, _ in
             let status = player.timeControlStatus
             Task { @MainActor [weak self] in
+                guard self?.flvPlayback == nil else { return }
                 self?.isPlaying = status == .playing
                 self?.isBuffering = status == .waitingToPlayAtSpecifiedRate
             }
@@ -56,8 +58,8 @@ final class PlayerModel {
             let options = note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if type == AVAudioSession.InterruptionType.began.rawValue { self.player.pause() }
-                else if AVAudioSession.InterruptionOptions(rawValue: options).contains(.shouldResume), self.wantsPlayback, !self.suspended { self.player.play() }
+                if type == AVAudioSession.InterruptionType.began.rawValue { self.pauseEngine() }
+                else if AVAudioSession.InterruptionOptions(rawValue: options).contains(.shouldResume), self.wantsPlayback, !self.suspended { self.playEngine() }
             }
         })
         #if DEBUG
@@ -81,6 +83,8 @@ final class PlayerModel {
         isResolving = true
         defer { if generation == token { isResolving = false; pendingQuality = nil } }
         do {
+            await BilibiliSession.shared.apply(to: service)
+            guard generation == token, !Task.isCancelled else { return }
             await Task.detached(priority: .userInitiated) {
                 try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
                 try? AVAudioSession.sharedInstance().setActive(true)
@@ -110,8 +114,10 @@ final class PlayerModel {
                     qualitySwitchMessage = "已切换至\(actualName)"
                 } else {
                     let name = requestedName ?? info.qualities.first { $0.id == quality }?.name ?? "所选画质"
-                    qualitySwitchMessage = "\(name)暂不可用，当前为\(actualName)"
+                    qualitySwitchMessage = "\(name)暂不可用，当前为\(actualName)" + (info.qualityNotice.map { "\n" + $0 } ?? "")
                 }
+            } else {
+                qualitySwitchMessage = info.qualityNotice
             }
             selectedLine = 0
             isResolving = false
@@ -140,6 +146,31 @@ final class PlayerModel {
         timeout?.cancel()
         let token = UUID()
         generation = token
+        flvPlayback?.stop()
+        flvPlayback = nil
+        if info.lines[index].url.pathExtension.lowercased() == "flv" {
+            player.pause()
+            player.replaceCurrentItem(with: nil)
+            let playback = FLVPlayback(url: info.lines[index].url, headers: info.headers, muted: muteState)
+            flvPlayback = playback
+            playback.onChange = { [weak self] engine in
+                guard let self, self.generation == token else { return }
+                self.isPreparing = !engine.isReady
+                self.isPlaying = engine.isPlaying
+                self.isBuffering = engine.isBuffering
+                if engine.isReady { self.timeout?.cancel() }
+                if engine.size.width > 0, engine.size.height > 0 { self.videoAspectRatio = engine.size.width / engine.size.height }
+            }
+            playback.onFailure = { [weak self] in
+                guard let self, self.generation == token else { return }
+                self.isPlaying = false
+                self.isBuffering = false
+                self.handleLineFailure()
+            }
+            playback.start(playing: wantsPlayback && !suspended)
+            startPreparationTimeout(token: token)
+            return
+        }
         let asset = AVURLAsset(url: info.lines[index].url, options: [
             AVURLAssetHTTPUserAgentKey: info.headers["User-Agent"] ?? HTTPClient.userAgent,
             "AVURLAssetHTTPHeaderFieldsKey": info.headers
@@ -173,6 +204,10 @@ final class PlayerModel {
         })
         player.replaceCurrentItem(with: item)
         if wantsPlayback, !suspended { player.play() }
+        startPreparationTimeout(token: token)
+    }
+
+    private func startPreparationTimeout(token: UUID) {
         timeout = Task { [weak self] in
             try? await Task.sleep(for: .seconds(20))
             guard !Task.isCancelled, let self, self.generation == token, self.isPreparing else { return }
@@ -182,18 +217,21 @@ final class PlayerModel {
 
     func togglePlayback() {
         wantsPlayback.toggle()
-        if wantsPlayback { player.play() } else { player.pause() }
+        if wantsPlayback { playEngine() } else { pauseEngine() }
     }
+
+    private func playEngine() { if let flvPlayback { flvPlayback.play() } else { player.play() } }
+    private func pauseEngine() { if let flvPlayback { flvPlayback.pause() } else { player.pause() } }
 
     func suspend() {
         suspended = true
-        player.pause()
+        pauseEngine()
     }
 
     func resume() {
         guard suspended else { return }
         suspended = false
-        if wantsPlayback, player.currentItem != nil { player.play() }
+        if wantsPlayback, player.currentItem != nil || flvPlayback != nil { playEngine() }
     }
 
     private func handleLineFailure() {
@@ -214,9 +252,12 @@ final class PlayerModel {
         sizeObservation?.invalidate()
         sizeObservation = nil
         failureObserver = nil
-        failureObserver = nil
         player.pause()
         player.replaceCurrentItem(with: nil)
+        flvPlayback?.stop()
+        flvPlayback = nil
+        isPlaying = false
+        isBuffering = false
         isPreparing = false
         isResolving = false
         pendingQuality = nil

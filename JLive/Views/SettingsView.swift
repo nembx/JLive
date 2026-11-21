@@ -114,6 +114,8 @@ private struct LicenseView: View {
             VStack(alignment: .leading, spacing: 20) {
                 Text("直播平台适配与 WBI 签名参考并改写自 xiaoyaocz/dart_simple_live（Copyright © 2023–2025 xiaoyaocz）。JLive 的 SwiftUI 界面和 Swift 核心是本项目的实现。按 GPL-3.0-or-later 许可分发，可依许可修改与再分发，不提供担保。")
                     .font(.subheadline)
+                Link("FLV 播放 · KSPlayer", destination: URL(string: "https://github.com/kingslay/KSPlayer")!)
+                Link("媒体解码 · FFmpegKit", destination: URL(string: "https://github.com/kingslay/FFmpegKit")!)
                 Text(license).font(.system(size: 11, design: .monospaced)).textSelection(.enabled)
             }.padding(20)
         }
