@@ -12,6 +12,7 @@ enum UIFixtures {
     /// Saved as offline. The fixture platform reports it live, like a streamer who started after the last visit.
     static let startedRoom = LiveRoom(platform: .bilibili, roomID: "4", title: "刚刚开播的直播间", streamer: "主播四", isLive: false)
     static var service: LiveService { LiveService(providers: [FixtureProvider()]) }
+    static var qrTransport: any BilibiliQRTransport { FixtureQRTransport() }
     @MainActor static func library() -> LibraryStore {
         let suite = "jlive-ui-fixtures"
         let defaults = UserDefaults(suiteName: suite)!
@@ -22,6 +23,17 @@ enum UIFixtures {
         store.record(rooms[0])
         return store
     }
+}
+
+/// A sign-in code that is never confirmed, so the page can be checked without reaching Bilibili.
+private struct FixtureQRTransport: BilibiliQRTransport {
+    func generate() async throws -> BilibiliQRLogin.Code {
+        BilibiliQRLogin.Code(url: URL(string: "https://account.bilibili.com/h5/account-h5/auth/scan-web?navhide=1&callback=close&qrcode_key=fixture&from=")!, key: "fixture")
+    }
+    func poll(key: String) async throws -> BilibiliQRLogin.State {
+        CommandLine.arguments.contains("--fixture-qr-expired") ? .expired : .waiting
+    }
+    func credentials() async -> BilibiliCredentials? { nil }
 }
 
 private actor FixtureProvider: LiveProvider {

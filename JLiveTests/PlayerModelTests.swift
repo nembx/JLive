@@ -4,11 +4,26 @@ import JLiveCore
 
 @MainActor
 final class PlayerModelTests: XCTestCase {
-    func testInitialPlaybackShowsThePlatformQualityNotice() async {
+    func testOpeningARoomKeepsThePlatformNoticeOutOfTheSwitchMessage() async {
         let model = makeModel(QualityProvider(notice: "平台当前仅返回原画"))
         await model.load()
-        XCTAssertEqual(model.qualitySwitchMessage, "平台当前仅返回原画")
-        XCTAssertEqual(model.playbackInfo?.qualityNotice, "平台当前仅返回原画")
+        XCTAssertNil(model.qualitySwitchMessage, "打开直播间不是切换画质，不应弹出提示")
+        XCTAssertEqual(model.playbackInfo?.qualityNotice, "平台当前仅返回原画", "提示仍保留在画质菜单和播放设置中")
+        await model.load(preference: .high)
+        XCTAssertNil(model.qualitySwitchMessage, "默认画质被平台回退时也不弹出提示")
+        model.stop()
+    }
+
+    func testSwitchMessageExpiresAndReconnectDoesNotBringItBack() async throws {
+        let model = makeModel(QualityProvider(returnsDefault: true, notice: "所选画质被平台回退"))
+        model.qualityMessageDuration = .milliseconds(50)
+        await model.load()
+        await model.load(quality: 100)
+        XCTAssertNotNil(model.qualitySwitchMessage)
+        try await Task.sleep(for: .milliseconds(400))
+        XCTAssertNil(model.qualitySwitchMessage, "提示由模型到时清除，重新显示播放器（如进入全屏）不会再弹")
+        await model.load()
+        XCTAssertNil(model.qualitySwitchMessage, "重新连接不是切换画质")
         model.stop()
     }
 

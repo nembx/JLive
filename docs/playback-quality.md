@@ -41,4 +41,12 @@ env JLIVE_QUALITY_LIVE_TESTS=1 DEVELOPER_DIR=/Applications/Xcode.app/Contents/De
 
 0.7.5 的 iPhone Release 构建已通过；76 项核心测试通过。模拟器也已使用源码播放器播放真实斗鱼 36252，依次切换高清、超清并确认重新进入可播放状态，已导出[真实播放截图](screenshots/player-douyu.png)。该测试用 `JLIVE_UI_LIVE_TESTS=1` 和 `TEST_RUNNER_JLIVE_UI_LIVE_TESTS=1` 启用 `PlayerUITests/testLiveDouyuQualitySwitch`，本次实际执行成功，没有跳过。全屏设置的确定性测试使用本地视频，避免房间突然下播改变测试路径。
 
+## 0.7.6 登录与提示交互
+
+2026-11-24：B站登录入口改为应用内页面，展示官方接口生成的二维码，可打开哔哩哔哩 App 确认，也可用另一台设备扫码。过期后可刷新；手机官方网页保留为短信或密码登录入口。确认后的账号仍须通过 B站登录状态接口验证，才保存到本机 Keychain。登录请求使用独立的临时 Cookie 存储，并保留同一套设备标识用于后续取流。
+
+画质浮层仅由手动画质选择触发，打开直播间、应用默认画质及重新连接不触发。模型在五秒后清除提示，播放器重新显示或进入全屏不会再次弹出旧提示。画质菜单和播放器设置仍可查看平台可用性说明；登录提示只用于访客，已登录账号切换失败时展示实际画质及平台回退原因。
+
+已通过 79 项核心测试、41 项应用单元测试、8 项相关界面测试，包括竖屏和全屏横屏登录页、二维码过期、画质回退和提示消失后进入全屏。真实二维码测试已取得 B站返回的二维码并连续查询等待状态，官方手机网页已确认完整显示短信及密码登录入口；账号确认及登录后高画质仍需使用实际账号验证。
+
 参考：[Simple Live 核心实现](https://github.com/xiaoyaocz/dart_simple_live/tree/master/simple_live_core/lib/src)、[Simple Live 播放器](https://github.com/xiaoyaocz/dart_simple_live/tree/master/simple_live_app/lib/modules/live_room/player)、[KSPlayer](https://github.com/kingslay/KSPlayer)、[斗鱼手机直播页](https://m.douyu.com/36252)、[B站直播页](https://live.bilibili.com/545068)。

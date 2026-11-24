@@ -43,7 +43,7 @@ final class BilibiliSession {
         credentials = nil
     }
 
-    static func credentials(from cookies: [HTTPCookie]) -> BilibiliCredentials? {
+    nonisolated static func credentials(from cookies: [HTTPCookie]) -> BilibiliCredentials? {
         let valid = cookies.filter { $0.domain == "bilibili.com" || $0.domain.hasSuffix(".bilibili.com") }
         let values = Dictionary(valid.map { ($0.name, $0.value) }, uniquingKeysWith: { a, _ in a })
         guard let session = values["SESSDATA"], !session.isEmpty,

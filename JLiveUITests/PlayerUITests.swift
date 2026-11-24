@@ -69,6 +69,102 @@ final class PlayerUITests: XCTestCase {
         XCTAssertEqual(notice.label, "平台当前仅提供超清")
     }
 
+    func testQualityNoticeOnlyAppearsAfterChoosingAQuality() throws {
+        let app = try launchQualityFixture(fallsBack: true, showsNotice: true)
+        defer { XCUIDevice.shared.orientation = .portrait; app.terminate() }
+        let quality = app.buttons["切换清晰度"]
+        let message = app.staticTexts["qualitySwitchMessage"]
+        XCTAssertTrue(quality.waitForExistence(timeout: 8))
+        XCTAssertFalse(message.waitForExistence(timeout: 2), "打开直播间不应弹出画质提示")
+        app.buttons["全屏播放"].tap()
+        XCTAssertTrue(app.buttons["退出全屏"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(message.waitForExistence(timeout: 2), "进入全屏不应弹出画质提示")
+        app.buttons["退出全屏"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["全屏播放"].waitForExistence(timeout: 5))
+        quality.tap()
+        app.buttons["原画"].tap()
+        XCTAssertTrue(message.waitForExistence(timeout: 8), "手动切换画质后才提示")
+        XCTAssertEqual(message.label, "原画暂不可用，当前为超清\n平台当前仅提供超清")
+        wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: message)], timeout: 10)
+        if !app.buttons["全屏播放"].exists { app.otherElements["videoSurface"].tap() }
+        app.buttons["全屏播放"].tap()
+        XCTAssertTrue(app.buttons["退出全屏"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(message.waitForExistence(timeout: 2), "提示消失后，进入全屏不应再次弹出")
+    }
+
+    func testBilibiliLoginIsAnInAppPageWithAConfirmationCode() throws {
+        let app = try launchQualityFixture(fallsBack: false)
+        defer { app.terminate() }
+        let quality = app.buttons["切换清晰度"]
+        XCTAssertTrue(quality.waitForExistence(timeout: 8))
+        quality.tap()
+        app.buttons["登录 B站获取更多画质"].tap()
+        XCTAssertTrue(app.images["bilibiliLoginCode"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.webViews.firstMatch.exists, "登录先显示应用内页面，不直接打开网页")
+        XCTAssertEqual(app.descendants(matching: .any)["bilibiliLoginStatus"].label, "等待确认")
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "B站应用内登录页"; screenshot.lifetime = .keepAlways; add(screenshot)
+        // The simulator has no Bilibili app, so the page has to say so and keep the other ways to sign in.
+        app.buttons["bilibiliLoginOpenApp"].tap()
+        XCTAssertTrue(app.staticTexts["bilibiliLoginAppMessage"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["改用网页登录（短信或密码）"].exists)
+        app.buttons["取消"].tap()
+        XCTAssertTrue(quality.waitForExistence(timeout: 5))
+    }
+
+    func testExpiredLoginCodeOffersAFreshOne() throws {
+        let app = try launchQualityFixture(fallsBack: false, extraArguments: ["--fixture-qr-expired"])
+        defer { app.terminate() }
+        let quality = app.buttons["切换清晰度"]
+        XCTAssertTrue(quality.waitForExistence(timeout: 8))
+        quality.tap()
+        app.buttons["登录 B站获取更多画质"].tap()
+        XCTAssertTrue(app.buttons["刷新二维码"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["bilibiliLoginOpenApp"].isEnabled, "过期的二维码不能再用于确认")
+    }
+
+    func testLoginPageFitsTheFullscreenLandscapePlayer() throws {
+        let app = try launchQualityFixture(fallsBack: false)
+        defer { XCUIDevice.shared.orientation = .portrait; app.terminate() }
+        XCTAssertTrue(app.buttons["全屏播放"].waitForExistence(timeout: 8))
+        app.buttons["全屏播放"].tap()
+        XCTAssertTrue(app.buttons["退出全屏"].firstMatch.waitForExistence(timeout: 5))
+        let quality = app.buttons["切换清晰度"]
+        if !quality.exists { app.otherElements["videoSurface"].tap() }
+        quality.tap()
+        app.buttons["登录 B站获取更多画质"].tap()
+        let code = app.images["bilibiliLoginCode"]
+        XCTAssertTrue(code.waitForExistence(timeout: 5))
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(window.width, window.height)
+        XCTAssertTrue(window.contains(code.frame), "横屏时二维码应完整显示")
+        XCTAssertTrue(app.buttons["bilibiliLoginOpenApp"].isHittable, "横屏时不需要滚动就能点确认按钮")
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "B站应用内登录页（横屏）"; screenshot.lifetime = .keepAlways; add(screenshot)
+    }
+
+    func testLiveBilibiliLoginCode() throws {
+        guard ProcessInfo.processInfo.environment["JLIVE_UI_LIVE_TESTS"] == "1" else { throw XCTSkip("真实登录二维码验证按需启用") }
+        let app = try launchQualityFixture(fallsBack: false, extraArguments: ["--live-qr-login"])
+        defer { app.terminate() }
+        let quality = app.buttons["切换清晰度"]
+        XCTAssertTrue(quality.waitForExistence(timeout: 8))
+        quality.tap()
+        app.buttons["登录 B站获取更多画质"].tap()
+        XCTAssertTrue(app.images["bilibiliLoginCode"].waitForExistence(timeout: 20), "应取得 B站返回的真实二维码")
+        // Stay through a few status requests: an unconfirmed code must keep waiting, not fail.
+        Thread.sleep(forTimeInterval: 7)
+        XCTAssertEqual(app.descendants(matching: .any)["bilibiliLoginStatus"].label, "等待确认")
+        XCTAssertTrue(app.buttons["bilibiliLoginOpenApp"].isEnabled)
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "B站真实登录二维码"; screenshot.lifetime = .keepAlways; add(screenshot)
+        app.buttons["改用网页登录（短信或密码）"].tap()
+        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 8)
+        let web = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        web.name = "B站网页登录"; web.lifetime = .keepAlways; add(web)
+    }
+
     func testFLVPlaybackAndQualitySwitchKeepPlaying() throws {
         let app = try launchQualityFixture(fallsBack: false, videoExtension: "flv")
         defer { app.terminate() }
@@ -112,12 +208,13 @@ final class PlayerUITests: XCTestCase {
         screenshot.name = "斗鱼真实超清 FLV 播放"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
 
-    private func launchQualityFixture(fallsBack: Bool, showsNotice: Bool = false, videoExtension: String = "mp4") throws -> XCUIApplication {
+    private func launchQualityFixture(fallsBack: Bool, showsNotice: Bool = false, videoExtension: String = "mp4", extraArguments: [String] = []) throws -> XCUIApplication {
         let app = XCUIApplication()
         let video = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "landscape", withExtension: videoExtension))
         app.launchArguments = ["--muted", "--ui-fixtures", "--fixture-quality-switch", "--fixture-video", video.path, "--open-room", "https://live.bilibili.com/1"]
         if fallsBack { app.launchArguments.append("--fixture-quality-fallback") }
         if showsNotice { app.launchArguments.append("--fixture-quality-notice") }
+        app.launchArguments += extraArguments
         app.launch()
         return app
     }

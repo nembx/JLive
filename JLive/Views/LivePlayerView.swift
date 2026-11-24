@@ -204,7 +204,6 @@ private struct PlayerSurface: View {
     @State private var showsControls = true
     @State private var showsSettings = false
     @State private var interaction = 0
-    @State private var showsQualityMessage = false
     @State private var showsBilibiliLogin = false
     @State private var showsQualityPicker = false
 
@@ -239,7 +238,7 @@ private struct PlayerSurface: View {
                         .allowsHitTesting(false)
                 }
                 if let error = model.errorMessage { errorView(error) }
-                if showsQualityMessage, let message = model.qualitySwitchMessage {
+                if let message = model.qualitySwitchMessage {
                     VStack {
                         Text(message).font(.caption.weight(.medium)).foregroundStyle(.white)
                             .padding(.horizontal, 12).padding(.vertical, 8)
@@ -284,13 +283,6 @@ private struct PlayerSurface: View {
         .onChange(of: showsQualityPicker) { _, _ in interaction += 1 }
         .sheet(isPresented: $showsBilibiliLogin) {
             BilibiliLoginView { Task { await model.load(preference: .original) } }
-        }
-        .task(id: model.qualitySwitchMessage) {
-            showsQualityMessage = model.qualitySwitchMessage != nil
-            guard showsQualityMessage else { return }
-            try? await Task.sleep(for: .seconds(5))
-            guard !Task.isCancelled else { return }
-            showsQualityMessage = false
         }
         .task(id: interaction) {
             guard !showsSettings, !showsQualityPicker else { return }

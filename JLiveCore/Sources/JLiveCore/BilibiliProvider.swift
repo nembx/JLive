@@ -213,7 +213,7 @@ public actor BilibiliProvider: LiveProvider {
         let actualName = qualities.first { $0.id == selected.quality }?.name ?? "平台默认画质"
         let notice: String?
         if isGuest, qualities.contains(where: { $0.id > selected.quality }) {
-            notice = "B站本次返回\(actualName)，部分高画质可能需要在官网登录后观看。"
+            notice = "B站本次返回\(actualName)，部分高画质可能需要登录后观看。"
         } else if let requestedQuality, requestedQuality != selected.quality {
             notice = "B站未提供所选画质，本次实际返回\(actualName)。"
         } else { notice = nil }

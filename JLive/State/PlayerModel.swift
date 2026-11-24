@@ -14,7 +14,21 @@ final class PlayerModel {
     private(set) var errorMessage: String?
     private(set) var selectedLine = 0
     private(set) var selectedQuality: Int?
-    private(set) var qualitySwitchMessage: String?
+    /// The result of a quality the viewer picked; opening a room or reconnecting never sets it.
+    private(set) var qualitySwitchMessage: String? {
+        didSet {
+            // The model owns the expiry, so the message cannot come back when the player view reappears, e.g. in full screen.
+            messageExpiry?.cancel()
+            guard qualitySwitchMessage != nil else { return }
+            messageExpiry = Task { [weak self, duration = qualityMessageDuration] in
+                try? await Task.sleep(for: duration)
+                guard !Task.isCancelled else { return }
+                self?.qualitySwitchMessage = nil
+            }
+        }
+    }
+    @ObservationIgnored var qualityMessageDuration = Duration.seconds(5)
+    @ObservationIgnored private var messageExpiry: Task<Void, Never>?
     private(set) var pendingQuality: Int?
     var qualityLabel: String {
         if isResolving, pendingQuality != nil { return "切换中…" }
@@ -116,8 +130,6 @@ final class PlayerModel {
                     let name = requestedName ?? info.qualities.first { $0.id == quality }?.name ?? "所选画质"
                     qualitySwitchMessage = "\(name)暂不可用，当前为\(actualName)" + (info.qualityNotice.map { "\n" + $0 } ?? "")
                 }
-            } else {
-                qualitySwitchMessage = info.qualityNotice
             }
             selectedLine = 0
             isResolving = false
