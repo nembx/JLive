@@ -106,16 +106,9 @@ struct BrowseView: View {
 
     private var header: some View {
         HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 7) {
-                    Image("BrandMark").resizable().frame(width: 42, height: 42).clipShape(RoundedRectangle(cornerRadius: 12))
-                    Text("JLive").font(.system(size: 34, weight: .heavy, design: .rounded))
-                    Text("LIVE").font(.system(size: 9, weight: .heavy, design: .monospaced))
-                        .tracking(1.5).padding(.horizontal, 7).padding(.vertical, 4)
-                        .foregroundStyle(.black).background(JLiveTheme.lime, in: Capsule())
-                }
-                Text("喜欢的直播，都在这里")
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
+            HStack(spacing: 7) {
+                Image("BrandMark").resizable().frame(width: 42, height: 42).clipShape(RoundedRectangle(cornerRadius: 12))
+                Text("JLive").font(.system(size: 34, weight: .heavy, design: .rounded))
             }
             Spacer()
             HStack(spacing: JLiveLayout.itemSpacing) {
@@ -158,10 +151,10 @@ struct BrowseView: View {
 
     @ViewBuilder private var content: some View {
         if isSearch && model.selectedPlatform?.supportsSearch == false {
-            EmptyState(symbol: "link", title: "通过链接打开抖音直播", message: "抖音关键词搜索需要登录，JLive 免登录使用\n点右上角粘贴直播间链接或输入房间号")
+            EmptyState(symbol: "link", title: "通过链接打开抖音直播", message: "点右上角输入链接或房间号")
                 .contentShape(Rectangle()).onTapGesture { searchFocused = false }
         } else if isSearch && model.keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            EmptyState(symbol: "magnifyingglass", title: "找到你喜欢的直播", message: "搜索 B站、虎牙和斗鱼\n输入关键词后点击搜索")
+            EmptyState(symbol: "magnifyingglass", title: "输入关键词搜索")
                 .contentShape(Rectangle()).onTapGesture { searchFocused = false }
         } else {
             VStack(alignment: .leading, spacing: 16) {
@@ -186,9 +179,10 @@ struct BrowseView: View {
                     .background(JLiveTheme.surface, in: RoundedRectangle(cornerRadius: 12))
                 }
                 if model.isLoading && model.rooms.isEmpty {
-                    ProgressView("正在寻找精彩…").frame(maxWidth: .infinity).padding(.vertical, 70)
+                    ProgressView("加载中…").frame(maxWidth: .infinity).padding(.vertical, 70)
+                        .accessibilityIdentifier("roomListLoading")
                 } else if model.hasLoaded && model.rooms.isEmpty {
-                    EmptyState(symbol: "antenna.radiowaves.left.and.right", title: model.issues.isEmpty ? "还没有找到直播间" : "暂时无法加载", message: "试试其他关键词、切换平台，或下拉刷新。")
+                    EmptyState(symbol: "antenna.radiowaves.left.and.right", title: model.issues.isEmpty ? "没有找到直播间" : "暂时无法加载")
                 }
                 if let error = model.errorMessage {
                     Text(error).font(.caption).foregroundStyle(.secondary)

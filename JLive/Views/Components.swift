@@ -178,13 +178,15 @@ struct RoomGrid: View {
 struct EmptyState: View {
     let symbol: String
     let title: String
-    let message: String
+    var message: String? = nil
     var body: some View {
         VStack(spacing: JLiveLayout.itemSpacing) {
             Image(systemName: symbol).font(.system(size: 36, weight: .light)).foregroundStyle(JLiveTheme.accent)
                 .frame(width: 82, height: 82).background(JLiveTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 24))
             Text(title).font(.headline)
-            Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            if let message {
+                Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            }
         }
         .padding(30).frame(maxWidth: .infinity).padding(.vertical, 40)
     }

@@ -53,7 +53,7 @@ struct CategoriesView: View {
                         }
                     }
                     if !isLoading && error == nil && filteredGroups.isEmpty {
-                        EmptyState(symbol: "square.grid.2x2", title: filter.isEmpty ? "暂无分区" : "没有匹配的分区", message: filter.isEmpty ? "可以先浏览推荐直播，或下拉刷新" : "试试其他关键词")
+                        EmptyState(symbol: "square.grid.2x2", title: filter.isEmpty ? "暂无分区" : "没有匹配的分区")
                     }
                 }
                 .padding(JLiveLayout.pageInset)

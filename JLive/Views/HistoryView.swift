@@ -10,10 +10,8 @@ struct HistoryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: JLiveLayout.sectionSpacing) {
                 if library.history.isEmpty {
-                    EmptyState(symbol: "clock", title: "还没有观看记录", message: "最近打开的直播间会出现在这里")
+                    EmptyState(symbol: "clock", title: "还没有观看记录")
                 } else {
-                    Text("最近打开的 \(library.history.count) 个直播间，按时间排列")
-                        .font(.caption).foregroundStyle(.secondary)
                     RoomGrid(rooms: library.history, service: service)
                 }
             }

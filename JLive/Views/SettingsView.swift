@@ -24,7 +24,6 @@ struct SettingsView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 17))
                         VStack(alignment: .leading, spacing: 8) {
                             Text("JLive").font(.title2.bold())
-                            Text("简简单单，看你喜欢的直播。").font(.caption).foregroundStyle(.secondary)
                             Text(verbatim: "v" + Self.version).font(.caption2.monospaced()).foregroundStyle(.secondary)
                         }
                     }.padding(.vertical, 10)
@@ -46,7 +45,7 @@ struct SettingsView: View {
                     }
                     .accessibilityIdentifier("appearancePicker")
                 }
-                Section {
+                Section("默认画质") {
                     Picker("蜂窝网络默认画质", selection: $library.cellularQuality) {
                         ForEach(PlaybackQuality.allCases) { Text($0.name).tag($0) }
                     }
@@ -55,10 +54,6 @@ struct SettingsView: View {
                         ForEach(PlaybackQuality.allCases) { Text($0.name).tag($0) }
                     }
                     .accessibilityIdentifier("wifiQualityPicker")
-                } header: {
-                    Text("默认画质")
-                } footer: {
-                    Text("打开直播时按当前网络选择画质。没有相同画质时，优先选择高一档，再选择低一档。")
                 }
                 Section("收藏备份") {
                     Button("导出收藏") {
@@ -66,15 +61,11 @@ struct SettingsView: View {
                         catch { message = error.localizedDescription }
                     }
                     Button("导入收藏") { importing = true }
-                    Text("导入会合并收藏。备份文件可保存在 iCloud 云盘或分享给另一台设备。")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Section("关于") {
                     Link("项目源码", destination: URL(string: "https://github.com/nembx/JLive")!)
                     Link("参考项目 · Simple Live", destination: URL(string: "https://github.com/xiaoyaocz/dart_simple_live")!)
                     NavigationLink("开源许可 · GPL v3") { LicenseView() }
-                    Text("JLive 使用公开的平台接口，接口变化可能影响使用。收藏与观看记录保存在这台设备上。")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
                 if let error = library.storageError {
                     Section("本地存储") { Text(error).font(.caption).foregroundStyle(.secondary) }
@@ -93,7 +84,7 @@ struct SettingsView: View {
                         throw LiveError.invalidResponse
                     }
                     try library.restore(Data(contentsOf: url))
-                    message = "收藏已导入"
+                    message = "收藏已合并导入"
                 } catch { message = "导入失败：\(error.localizedDescription)" }
             }
             .alert("收藏备份", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {

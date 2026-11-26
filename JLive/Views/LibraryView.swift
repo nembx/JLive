@@ -12,11 +12,12 @@ struct LibraryView: View {
 
     /// Tells the viewer how current the statuses are, since they decide which list a room is in.
     private var statusLine: some View {
-        HStack(spacing: 6) {
-            if library.isRefreshing { ProgressView().controlSize(.mini) }
-            Text(library.isRefreshing ? "正在更新开播状态…" : (library.refreshMessage ?? "开播状态会自动更新"))
-            Spacer(minLength: 12)
-            if !rooms.isEmpty { Text("长按卡片管理收藏").fixedSize() }
+        Group {
+            if library.isRefreshing {
+                ProgressView("正在更新开播状态…").progressViewStyle(.circular).controlSize(.mini)
+            } else if let message = library.refreshMessage {
+                Text(message)
+            }
         }
         .font(.caption).foregroundStyle(.secondary)
     }
@@ -26,10 +27,7 @@ struct LibraryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: JLiveLayout.sectionSpacing) {
                     HStack {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("我的直播间").font(.system(size: 28, weight: .bold))
-                            Text("把喜欢留住，下次一键相遇").font(.caption).foregroundStyle(.secondary)
-                        }
+                        Text("我的直播间").font(.system(size: 28, weight: .bold))
                         Spacer()
                         CircleIconButton(symbol: "plus", label: "添加直播间") { showingAddRoom = true }
                     }
@@ -42,13 +40,8 @@ struct LibraryView: View {
                     if !library.favorites.isEmpty { statusLine }
                     if rooms.isEmpty {
                         EmptyState(symbol: filter == .live ? "antenna.radiowaves.left.and.right" : "heart",
-                            title: library.favorites.isEmpty ? "收藏你的第一个直播间" : (filter == .live ? "暂时没有主播开播" : "暂时没有未开播的主播"),
-                            message: library.favorites.isEmpty ? "打开直播间后点击爱心收藏，\n也可以直接添加直播间链接。" : "切换开播状态查看收藏，或下拉刷新。")
+                            title: library.favorites.isEmpty ? "暂无收藏" : (filter == .live ? "暂无开播的直播间" : "暂无未开播的直播间"))
                     } else {
-                        if filter == .offline, !library.isRefreshing, rooms.contains(where: { $0.isLive == nil }) {
-                            Text("包含状态待更新的直播间，下拉可重新查询")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
                         RoomGrid(rooms: rooms, service: service)
                     }
                 }

@@ -103,8 +103,6 @@ struct RoomDetailView: View {
                 if !model.room.platform.supportsNativePlayback {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("前往平台观看", systemImage: "safari").font(.headline)
-                        Text("这个平台目前通过官网观看，直播间可以收藏在 JLive 中。")
-                            .font(.subheadline).foregroundStyle(.secondary)
                         Button { showingWebsite = true } label: { Label("打开直播间", systemImage: "arrow.up.right") }
                             .buttonStyle(.borderedProminent)
                     }

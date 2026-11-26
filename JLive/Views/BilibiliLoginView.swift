@@ -41,11 +41,7 @@ struct BilibiliLoginView: View {
     }
 
     private var heading: some View {
-        VStack(spacing: 8) {
-            Text("用哔哩哔哩 App 确认登录").font(.title3.bold())
-            Text("登录后可使用账号能观看的直播画质").font(.subheadline).foregroundStyle(.secondary)
-        }
-        .multilineTextAlignment(.center)
+        Text("用哔哩哔哩 App 确认登录").font(.title3.bold()).multilineTextAlignment(.center)
     }
 
     private var codeCard: some View {
